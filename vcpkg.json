@@ -37,6 +37,8 @@
     {"name":"openxr-loader","features":["vulkan"]},
     "vulkan",
     "vulkan-memory-allocator",
-    "bgfx"
+
+    "pugixml",
+    "gtest"
   ]
 }
