@@ -33,6 +33,11 @@
     },
     "implot",
     {"name":"glfw3","features":["wayland"]},
+    {
+      "name": "mimalloc",
+      "features": [ "override" ]
+    },
+    "tracy",
     "glew",
     {"name":"openxr-loader","features":["vulkan"]},
     "vulkan",

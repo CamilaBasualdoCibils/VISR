@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ARUI/Language/node.hpp"
 #include "ARUI/Render/Backends/OpenGL/OpenGLCommons.hpp"
 #include "ARUI/Render/Backends/OpenGL/OpenGLRenderDevice.hpp"
 #include "ARUI/Tools/Simulator/SimulatorViewProvider.hpp"
@@ -8,6 +9,7 @@
 
 #include <array>
 #include <memory>
+#include <optional>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
@@ -28,10 +30,16 @@ public:
   std::vector<std::string> GetRequiredVulkanExtensions() const override;
 
   [[nodiscard]] bool ShouldClose() const;
+  std::optional<std::vector<Language::LNode>> TakeSubmittedDocument();
+  void SetRuntimeRevision(uint64_t revision) noexcept {
+    runtimeRevision_ = revision;
+  }
 
 private:
   void DrawEditorShell();
   void DrawTrackingInspector();
+  void DrawDocumentEditor();
+  bool DrawLanguageNodeEditor(Language::LNode &node, bool root);
   void DrawScenePanel();
   void DrawViewport();
   void DrawConsole();
@@ -48,6 +56,11 @@ private:
   std::size_t presentedViewCount_{};
   int selectedView_{};
   bool dockLayoutInitialized_{};
+  std::vector<Language::LNode> draftDocuments_;
+  std::optional<std::vector<Language::LNode>> submittedDocuments_;
+  uint64_t runtimeRevision_{};
+  bool autoSubmit_{true};
+  bool documentChangedThisFrame_{};
   std::shared_ptr<SimulatorXRTracker> tracker_;
   std::shared_ptr<SimulatorViewProvider> views_;
   std::shared_ptr<Render::OpenGLRenderDevice> renderDevice_;

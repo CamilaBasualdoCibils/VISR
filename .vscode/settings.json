@@ -15,5 +15,8 @@
         "text": "skip -rfu ^std::.*"
       }
     ]
-  }
+  },
+  "cmake.configureArgs": [
+    "-DARUI_ENABLE_TRACY=ON"
+  ]
 }

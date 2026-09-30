@@ -4,6 +4,7 @@
 #include "ARUI/Language/AttributeValue.hpp"
 #include "ARUI/Language/Style.hpp"
 #include <boost/describe/class.hpp>
+#include <boost/describe/enum.hpp>
 #include <boost/describe/members.hpp>
 #include <boost/mp11/algorithm.hpp>
 #include <boost/mp11/detail/mp_list.hpp>
@@ -33,9 +34,13 @@ enum class LNodeType {
   Panel
 };
 
+enum class SurfaceType { Plane, Cylinder, Sphere, Parametric, Mesh };
+BOOST_DESCRIBE_ENUM(SurfaceType, Plane, Cylinder, Sphere, Parametric, Mesh)
+
 struct LNode {
   LNodeID id{};
   LNodeType type;
+  SurfaceType surfaceType{SurfaceType::Plane};
 
   Attributes attributes;
   Style style;
@@ -88,18 +93,18 @@ template <typename Options> Attributes AttributesFrom(const Options &options) {
 // ============================================================
 // Surface
 // ============================================================
-
 struct SurfaceOptions {
   std::optional<std::string> anchor;
+  SurfaceType surfaceType{SurfaceType::Plane};
 };
 
-BOOST_DESCRIBE_STRUCT(SurfaceOptions, (),
-                      (anchor))
+BOOST_DESCRIBE_STRUCT(SurfaceOptions, (), (anchor))
 
 inline LNode LSurface(std::vector<LNode> children = {},
                       SurfaceOptions options = {}, Style style = {}) {
   return {
       .type = LNodeType::Surface,
+      .surfaceType = options.surfaceType,
       .attributes = AttributesFrom(options),
       .style = std::move(style),
       .children = std::move(children),

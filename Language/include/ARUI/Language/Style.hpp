@@ -13,7 +13,6 @@
 
 namespace ARUI::Language {
 
-using Size = Length;
 
 struct PainterReference {
   std::string name;
@@ -45,12 +44,12 @@ struct PainterStyleSchema {
 // These are specified declarations, not computed values. A future resolver
 // must apply cascade and inheritance policy per property.
 struct Style {
-  std::optional<Size> width;
-  std::optional<Size> height;
-  std::optional<Size> minWidth;
-  std::optional<Size> minHeight;
-  std::optional<Size> maxWidth;
-  std::optional<Size> maxHeight;
+  Length width;
+  Length height;
+  Length minWidth;
+  Length minHeight;
+  Length maxWidth;
+  Length maxHeight;
 
   std::optional<Length> margin;
   std::optional<Length> padding;

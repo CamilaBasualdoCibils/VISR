@@ -15,6 +15,7 @@ struct ActionReference {
 };
 
 enum class LengthUnit {
+    Auto,
     Pixel,
     Millimeter,
     Centimeter,
@@ -22,8 +23,14 @@ enum class LengthUnit {
     Percent
 };
 struct Length {
-  double value;
-  LengthUnit unit;
+  double value{};
+  LengthUnit unit{LengthUnit::Auto};
+
+  [[nodiscard]] bool IsAuto() const noexcept {
+    return unit == LengthUnit::Auto;
+  }
+
+  bool operator==(const Length &) const = default;
 };
 enum class AngleUnit {
     Degree,

@@ -22,7 +22,7 @@ private:
   std::shared_ptr<SimulatorXRTracker> tracker_;
   Pose debugCamera_{
       {2.0F, 1.8F, 2.0F},
-      glm::quatLookAt(glm::normalize(glm::vec3{-2.0F, -0.3F, -2.0F}),
+      glm::quatLookAt(glm::normalize(glm::vec3{-2.0F, -0.3F, -4.0F}),
                       glm::vec3{0.0F, 1.0F, 0.0F})};
   std::array<RenderView, 3> views_;
 };

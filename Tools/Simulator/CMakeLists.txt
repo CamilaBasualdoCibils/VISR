@@ -8,6 +8,7 @@ target_include_directories(ARUISimulator PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
 target_link_libraries(ARUISimulator PUBLIC
+    ARUI::Runtime
     ARUI::XRDisplay
     ARUI::XRTracking
     ARUI::RenderOpenGL
@@ -20,3 +21,4 @@ add_executable(AruiSimulator src/main.cpp)
 target_link_libraries(AruiSimulator PRIVATE
     ARUI::Simulator
     ARUI::RenderOpenGL)
+arui_enable_runtime_instrumentation(AruiSimulator)

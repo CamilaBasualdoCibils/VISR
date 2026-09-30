@@ -30,7 +30,8 @@ RuntimeTransaction::RuntimeTransaction(RuntimeTree &tree)
       nextID_(tree.nextID_), baseRevision_(tree.revision_) {}
 
 RuntimeTransaction::RuntimeTransaction(RuntimeTransaction &&other) noexcept
-    : tree_(std::exchange(other.tree_, nullptr)), nodes_(std::move(other.nodes_)),
+    : tree_(std::exchange(other.tree_, nullptr)),
+      nodes_(std::move(other.nodes_)),
       rootChildren_(std::move(other.rootChildren_)), nextID_(other.nextID_),
       baseRevision_(other.baseRevision_), finished_(other.finished_) {
   other.finished_ = true;
@@ -77,22 +78,24 @@ std::vector<NodeID> &RuntimeTransaction::ChildrenOf(NodeID parent) {
   return parent == RootNodeID ? rootChildren_ : Require(parent).children;
 }
 
-const std::vector<NodeID> &
-RuntimeTransaction::ChildrenOf(NodeID parent) const {
+const std::vector<NodeID> &RuntimeTransaction::ChildrenOf(NodeID parent) const {
   return parent == RootNodeID ? rootChildren_ : Require(parent).children;
 }
 
-NodeID RuntimeTransaction::Insert(NodeID parent,
-                                  const Language::LNode &node) {
+NodeID RuntimeTransaction::Insert(NodeID parent, const Language::LNode &node) {
   RequireActive();
   if (!ParentExists(parent))
     throw std::out_of_range("runtime parent does not exist");
+  if (parent == RootNodeID && node.type != Language::LNodeType::Surface)
+    throw std::invalid_argument("runtime root nodes must be surfaces");
   if (!node.children.empty())
-    throw std::invalid_argument("Insert accepts one node; use InsertTree for descendants");
+    throw std::invalid_argument(
+        "Insert accepts one node; use InsertTree for descendants");
 
   const NodeID id = nextID_++;
   nodes_.emplace(id, RNode{.id = id,
                            .type = node.type,
+                           .surfaceType = node.surfaceType,
                            .parent = parent,
                            .attributes = node.attributes,
                            .style = node.style});
@@ -105,6 +108,7 @@ NodeID RuntimeTransaction::InsertTree(NodeID parent,
   RequireActive();
   Language::LNode root{.id = tree.id,
                        .type = tree.type,
+                       .surfaceType = tree.surfaceType,
                        .attributes = tree.attributes,
                        .style = tree.style};
   const NodeID rootID = Insert(parent, root);
@@ -133,6 +137,9 @@ void RuntimeTransaction::Move(NodeID node, NodeID newParent) {
   const NodeID oldParent = Require(node).parent;
   if (!ParentExists(newParent))
     throw std::out_of_range("runtime parent does not exist");
+  if (newParent == RootNodeID &&
+      Require(node).type != Language::LNodeType::Surface)
+    throw std::invalid_argument("runtime root nodes must be surfaces");
   if (node == newParent)
     throw std::invalid_argument("a node cannot parent itself");
 
@@ -160,20 +167,22 @@ void RuntimeTransaction::SetVisibility(NodeID node, bool visible) {
   Require(node).visible = visible;
 }
 
-void RuntimeTransaction::ReorderChildren(
-    NodeID parent, std::span<const NodeID> children) {
+void RuntimeTransaction::ReorderChildren(NodeID parent,
+                                         std::span<const NodeID> children) {
   RequireActive();
   if (!ParentExists(parent))
     throw std::out_of_range("runtime parent does not exist");
   const auto &current = ChildrenOf(parent);
   if (children.size() != current.size())
-    throw std::invalid_argument("new child order must contain every child exactly once");
+    throw std::invalid_argument(
+        "new child order must contain every child exactly once");
 
   const std::unordered_set<NodeID> expected(current.begin(), current.end());
   const std::unordered_set<NodeID> supplied(children.begin(), children.end());
   if (expected.size() != current.size() || supplied.size() != children.size() ||
       expected != supplied)
-    throw std::invalid_argument("new child order must contain every child exactly once");
+    throw std::invalid_argument(
+        "new child order must contain every child exactly once");
   ChildrenOf(parent).assign(children.begin(), children.end());
 }
 

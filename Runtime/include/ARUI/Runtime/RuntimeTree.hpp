@@ -16,6 +16,7 @@ inline constexpr NodeID RootNodeID = 0;
 struct RNode {
   NodeID id{};
   Language::LNodeType type{};
+  Language::SurfaceType surfaceType{Language::SurfaceType::Plane};
   NodeID parent{RootNodeID};
   std::vector<NodeID> children;
   Language::Attributes attributes;

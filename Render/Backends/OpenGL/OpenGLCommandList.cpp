@@ -2,12 +2,19 @@
 #include "ARUI/Render/Backends/OpenGL/OpenGLCommons.hpp"
 #include "ARUI/Render/Backends/OpenGL/OpenGLRenderDevice.hpp"
 
+#if defined(TRACY_ENABLE)
+#include <tracy/TracyOpenGL.hpp>
+#endif
+
 namespace {
 thread_local GLuint activeFramebuffer = 0;
 }
 
 void ARUI::Render::OpenGLCommandList::BeginRenderCommand::Execute(
     OpenGLRenderDevice *renderDevice) {
+#if defined(TRACY_ENABLE)
+  TracyGpuZone("OpenGL Begin Render Pass");
+#endif
   if (desc.colorAttachment.value != 0) {
     glCreateFramebuffers(1, &activeFramebuffer);
     const GLuint texture =
@@ -58,6 +65,9 @@ void ARUI::Render::OpenGLCommandList::BindIndexBufferCommand::Execute(
 
 void ARUI::Render::OpenGLCommandList::DrawCommand::Execute(
     OpenGLRenderDevice *) {
+#if defined(TRACY_ENABLE)
+  TracyGpuZone("OpenGL Draw");
+#endif
   const auto primitive = OpenGL::GetGLPrimitiveTopology(topology);
   if (!primitive)
     throw std::invalid_argument("invalid OpenGL primitive topology");
@@ -67,6 +77,9 @@ void ARUI::Render::OpenGLCommandList::DrawCommand::Execute(
 
 void ARUI::Render::OpenGLCommandList::DrawIndexedCommand::Execute(
     OpenGLRenderDevice *) {
+#if defined(TRACY_ENABLE)
+  TracyGpuZone("OpenGL Draw Indexed");
+#endif
   glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indexCount),
                  GL_UNSIGNED_INT, nullptr);
 }

@@ -3,6 +3,11 @@
 #include "ARUI/Render/Backends/OpenGL/OpenGLCommons.hpp"
 #include "ARUI/Render/RenderCommons.hpp"
 #include <unordered_set>
+
+#if defined(TRACY_ENABLE)
+#include <tracy/Tracy.hpp>
+#include <tracy/TracyOpenGL.hpp>
+#endif
 static void APIENTRY OpenGLDebugCallback(GLenum, GLenum, GLuint id,
                                          GLenum severity, GLsizei,
                                          const GLchar *message,
@@ -81,6 +86,10 @@ ARUI::Render::OpenGLRenderDevice::OpenGLRenderDevice() : IRenderDevice() {
     throw std::runtime_error(
         reinterpret_cast<const char *>(glewGetErrorString(glewError)));
   glGetError(); // GLEW may generate GL_INVALID_ENUM on core contexts.
+
+#if defined(TRACY_ENABLE)
+  TracyGpuContext;
+#endif
 
   glEnable(GL_DEBUG_OUTPUT);
   glDebugMessageCallback(OpenGLDebugCallback, logger.get());
@@ -271,14 +280,19 @@ ARUI::Render::OpenGLRenderDevice::CreateCommandList(QueueType type) {
 }
 void ARUI::Render::OpenGLRenderDevice::Submit(
     const IRenderCommandList &commandList) {
+#if defined(TRACY_ENABLE)
+  ZoneScopedN("OpenGL Command Submission");
+#endif
   ActivateContext();
   const OpenGLCommandList &glCommandList =
       dynamic_cast<const OpenGLCommandList &>(commandList);
   auto commandQueue = glCommandList.GetCommandQueue();
   for (auto &command : commandQueue) {
-
     std::visit([this](auto &&cmd) { cmd.Execute(this); }, command);
   }
+#if defined(TRACY_ENABLE)
+  TracyGpuCollect;
+#endif
 }
 
 ARUI::Render::RenderCapabilities
