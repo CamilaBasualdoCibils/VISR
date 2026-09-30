@@ -1,39 +1,58 @@
 #pragma once
 
-#include "ARUI/XR/Display/IPresenter.hpp"
 #include "ARUI/Render/Backends/OpenGL/OpenGLCommons.hpp"
+#include "ARUI/Render/Backends/OpenGL/OpenGLRenderDevice.hpp"
+#include "ARUI/Tools/Simulator/SimulatorViewProvider.hpp"
+#include "ARUI/Tools/Simulator/SimulatorXRTracker.hpp"
+#include "ARUI/XR/Display/IPresenter.hpp"
+
+#include <array>
 #include <memory>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
-#include <stdexcept>
+
 namespace ARUI::Tools::Simulator {
-class SimulatorPresenter : public IPresenter {
+
+class SimulatorPresenter final : public IPresenter {
 public:
-  std::vector<std::string>
-  GetRequiredVulkanExtensions() const override {
-    // TODO: Implement this pure virtual method.
-    uint32_t count = 0;
-    const char **extensions = glfwGetRequiredInstanceExtensions(&count);
-    std::vector<std::string> result;
-    for (uint32_t i = 0; i < count; ++i) {
-      result.push_back(std::string(extensions[i]));
-    }
-    return result;
-  }
+  SimulatorPresenter();
+  SimulatorPresenter(std::shared_ptr<SimulatorXRTracker> tracker,
+                     std::shared_ptr<SimulatorViewProvider> views);
+  ~SimulatorPresenter() override;
 
   void BeginFrame() override;
-
-  void Present(const RenderView &view, RenderTargetHandle target) override;
-
+  void Present(const RenderView &view, Render::ImageViewHandle image) override;
+  void
+  SetRenderDevice(std::shared_ptr<Render::OpenGLRenderDevice> renderDevice);
   void EndFrame() override;
+  std::vector<std::string> GetRequiredVulkanExtensions() const override;
 
-  SimulatorPresenter();
-  ~SimulatorPresenter();
+  [[nodiscard]] bool ShouldClose() const;
 
 private:
-  void DrawSimulator();
-  GLFWwindow *window;
-  std::shared_ptr<spdlog::logger> logger =
+  void DrawEditorShell();
+  void DrawTrackingInspector();
+  void DrawScenePanel();
+  void DrawViewport();
+  void DrawConsole();
+  void DrawPoseEditor(const char *label, Pose &pose);
+  void DrawTrackedPoseEditor(const char *label, TrackedPose &trackedPose);
+
+  struct PresentedView {
+    RenderView view;
+    Render::ImageViewHandle image;
+  };
+
+  GLFWwindow *window{};
+  std::array<PresentedView, 3> presentedViews_{};
+  std::size_t presentedViewCount_{};
+  int selectedView_{};
+  bool dockLayoutInitialized_{};
+  std::shared_ptr<SimulatorXRTracker> tracker_;
+  std::shared_ptr<SimulatorViewProvider> views_;
+  std::shared_ptr<Render::OpenGLRenderDevice> renderDevice_;
+  std::shared_ptr<spdlog::logger> logger_ =
       spdlog::stdout_color_mt("Simulator-Presenter");
 };
+
 } // namespace ARUI::Tools::Simulator

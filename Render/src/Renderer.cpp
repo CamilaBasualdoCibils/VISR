@@ -55,11 +55,10 @@ void AppendRectangle(GeometryBatch &batch, const RectangleShape &rectangle,
   const auto baseVertex = static_cast<uint32_t>(batch.vertices.size());
   const glm::vec2 halfSize = rectangle.size * 0.5F;
   constexpr float z = 0.0F;
-  for (const glm::vec3 position :
-       {glm::vec3{-halfSize.x, -halfSize.y, z},
-        glm::vec3{halfSize.x, -halfSize.y, z},
-        glm::vec3{halfSize.x, halfSize.y, z},
-        glm::vec3{-halfSize.x, halfSize.y, z}})
+  for (const glm::vec3 position : {glm::vec3{-halfSize.x, -halfSize.y, z},
+                                   glm::vec3{halfSize.x, -halfSize.y, z},
+                                   glm::vec3{halfSize.x, halfSize.y, z},
+                                   glm::vec3{-halfSize.x, halfSize.y, z}})
     batch.vertices.emplace_back(transform * glm::vec4(position, 1.0F));
   for (const uint32_t index : {0U, 1U, 2U, 2U, 3U, 0U})
     batch.indices.push_back(baseVertex + index);
@@ -137,7 +136,8 @@ void Renderer::BuildRenderGraph(RenderGraph &graph) {
 
         auto commands = device->CreateCommandList(QueueType::Graphics);
         commands->BeginRendering(data.configuration.renderPass);
-        commands->BindPipeline(data.configuration.pipeline);
+        if (data.configuration.pipeline.value != 0)
+          commands->BindPipeline(data.configuration.pipeline);
 
         GeometryBatch batch;
         for (const auto &surface : data.surfaces) {
@@ -159,7 +159,8 @@ void Renderer::BuildRenderGraph(RenderGraph &graph) {
           const auto indexBytes = std::as_bytes(std::span{batch.indices});
           vertexBuffer = device->CreateBuffer(
               {.size = static_cast<uint32_t>(vertexBytes.size()),
-               .usage = static_cast<BufferUsage>(BufferUsageFlags::VertexBuffer),
+               .usage =
+                   static_cast<BufferUsage>(BufferUsageFlags::VertexBuffer),
                .initialData = vertexBytes});
           indexBuffer = device->CreateBuffer(
               {.size = static_cast<uint32_t>(indexBytes.size()),

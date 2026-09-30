@@ -4,6 +4,7 @@
 #include "ARUI/Render/Backends/OpenGL/OpenGLCommons.hpp"
 #include "ARUI/Render/IRenderDevice.hpp"
 #include "ARUI/Render/RenderCommons.hpp"
+#include <EGL/egl.h>
 #include <GL/glext.h>
 #include <atomic>
 #include <spdlog/logger.h>
@@ -14,11 +15,12 @@ class OpenGLRenderDevice : public IRenderDevice {
 
 public:
   ImageViewHandle CreateImageView(const ImageViewDesc &desc) override {
+    ActivateContext();
 
     GLenum textureTarget = OpenGL::GetGLImageType(desc.viewType).value();
     GLenum format = OpenGL::GetGLImageFormat(desc.format).value();
     GLuint textureView;
-    glCreateTextures(textureTarget, 1, &textureView);
+    glGenTextures(1, &textureView);
     glTextureView(textureView, textureTarget, GetGLTexture(desc.image).id,
                   format, desc.baseMipLevel, desc.mipLevelCount,
                   desc.baseArrayLayer, desc.arrayLayerCount);
@@ -31,6 +33,7 @@ public:
   }
 
   OpenGLRenderDevice();
+  ~OpenGLRenderDevice() override;
   ImageHandle CreateImage(const ImageDesc &desc) override;
 
   BufferHandle CreateBuffer(const BufferDesc &desc) override;
@@ -45,9 +48,10 @@ public:
   void Destroy(ImageHandle handle) override;
 
   void Destroy(BufferHandle handle) override;
-  void Destroy(ImageViewHandle) override {
-    // TODO: Implement this pure virtual method.
-    assert(false && "Method `Destroy` is not implemented.");
+  void Destroy(ImageViewHandle handle) override {
+    ActivateContext();
+    glDeleteTextures(1, &textureViews.at(handle).id);
+    textureViews.erase(handle);
   }
 
   std::unique_ptr<IRenderCommandList>
@@ -88,6 +92,12 @@ public:
   }
 
 private:
+  void ActivateContext() const;
+
+  EGLDisplay eglDisplay_{EGL_NO_DISPLAY};
+  EGLSurface eglSurface_{EGL_NO_SURFACE};
+  EGLContext eglContext_{EGL_NO_CONTEXT};
+
   const RenderCapabilities capabilities{};
   static RenderCapabilities GetGLCapabilities();
 

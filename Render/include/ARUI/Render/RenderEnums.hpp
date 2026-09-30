@@ -32,7 +32,10 @@ enum class ImageFormat : uint32_t {
   R8G8B8_SINT,
   R8G8B8_SRGB,
 
-  //Depth
+  R8G8B8A8_UNORM,
+  R8G8B8A8_SRGB,
+
+  // Depth
   DEPTH16,
   DEPTH32,
   DEPTH24_STENCIL8,

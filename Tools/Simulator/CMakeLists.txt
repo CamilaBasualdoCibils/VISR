@@ -1,4 +1,8 @@
-add_library(ARUISimulator STATIC src/SimulatorPresenter.cpp)
+add_library(ARUISimulator STATIC
+    src/SimulatorApplication.cpp
+    src/SimulatorPresenter.cpp
+    src/SimulatorViewProvider.cpp
+    src/SimulatorXRTracker.cpp)
 add_library(ARUI::Simulator ALIAS ARUISimulator)
 target_include_directories(ARUISimulator PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -11,3 +15,8 @@ target_link_libraries(ARUISimulator PUBLIC
     implot::implot
     glfw
     spdlog::spdlog)
+
+add_executable(AruiSimulator src/main.cpp)
+target_link_libraries(AruiSimulator PRIVATE
+    ARUI::Simulator
+    ARUI::RenderOpenGL)

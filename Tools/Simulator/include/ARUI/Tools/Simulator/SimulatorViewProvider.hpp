@@ -1,34 +1,30 @@
 #pragma once
 
+#include "ARUI/Tools/Simulator/SimulatorXRTracker.hpp"
 #include "ARUI/XR/Display/IViewProvider.hpp"
-#include "ARUI/XR/Display/RenderView.hpp"
-#include <glm/ext/matrix_clip_space.hpp>
-#include <glm/ext/matrix_transform.hpp>
+
+#include <array>
+#include <memory>
+
 namespace ARUI::Tools::Simulator {
-class SimulatorViewProvider : public IViewProvider {
 
+class SimulatorViewProvider final : public IViewProvider {
 public:
-  void BeginFrame() override {}
+  explicit SimulatorViewProvider(std::shared_ptr<SimulatorXRTracker> tracker);
 
-  std::span<const RenderView> GetViews() const override { return views; }
-
+  void BeginFrame() override;
+  std::span<const RenderView> GetViews() const override { return views_; }
   void EndFrame() override {}
 
+  Pose &DebugCamera() noexcept { return debugCamera_; }
+
 private:
-  std::vector<RenderView> views = {
-      RenderView{
-          .Name = "DebugCamera",
-          .view = glm::lookAt(glm::vec3(2.0f), glm::vec3(0, 1, 0),
-                              glm::vec3(0, 1, 0)),
-          .projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f,
-                                         0.1f, 100.0f),
-          .viewportSize = glm::ivec2(800, 600),
-      },
-      RenderView{.Name = "Head",
-                 .view = glm::lookAt(glm::vec3(0, 1.8, 0), glm::vec3(0, 1.8, 1),
-                                     glm::vec3(0, 1, 0)),
-                 .projection = glm::perspective(glm::radians(45.0f),
-                                                800.0f / 600.0f, 0.1f, 100.0f),
-                 .viewportSize = glm::ivec2(800, 600)}};
+  std::shared_ptr<SimulatorXRTracker> tracker_;
+  Pose debugCamera_{
+      {2.0F, 1.8F, 2.0F},
+      glm::quatLookAt(glm::normalize(glm::vec3{-2.0F, -0.3F, -2.0F}),
+                      glm::vec3{0.0F, 1.0F, 0.0F})};
+  std::array<RenderView, 3> views_;
 };
+
 } // namespace ARUI::Tools::Simulator

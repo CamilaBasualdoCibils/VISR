@@ -28,6 +28,8 @@ const std::unordered_map<ImageFormat, GLenum> textureFormatToGLenumMap = {
     {ImageFormat::R8G8B8_UINT, GL_RGB8UI},
     {ImageFormat::R8G8B8_SINT, GL_RGB8I},
     {ImageFormat::R8G8B8_SRGB, GL_RGB8},
+    {ImageFormat::R8G8B8A8_UNORM, GL_RGBA8},
+    {ImageFormat::R8G8B8A8_SRGB, GL_SRGB8_ALPHA8},
     {ImageFormat::DEPTH24_STENCIL8, GL_DEPTH24_STENCIL8}};
 inline std::optional<GLenum> GetGLImageFormat(ImageFormat format) {
   auto it = textureFormatToGLenumMap.find(format);
@@ -127,11 +129,11 @@ const std::unordered_map<ImageType, GLenum> imageTypeToGLenumMap = {
     {ImageType::Image2DArray, GL_TEXTURE_2D_ARRAY},
     {ImageType::Cube, GL_TEXTURE_CUBE_MAP},
     {ImageType::CubeArray, GL_TEXTURE_CUBE_MAP_ARRAY}};
-    inline std::optional<GLenum> GetGLImageType(ImageType type) {
-      auto it = imageTypeToGLenumMap.find(type);
-      if (it != imageTypeToGLenumMap.end()) {
-        return it->second;
-      }
-      return std::nullopt;
-    }
+inline std::optional<GLenum> GetGLImageType(ImageType type) {
+  auto it = imageTypeToGLenumMap.find(type);
+  if (it != imageTypeToGLenumMap.end()) {
+    return it->second;
+  }
+  return std::nullopt;
+}
 } // namespace ARUI::Render::OpenGL

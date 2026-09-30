@@ -6,15 +6,17 @@ namespace ARUI::Render {
 class IRenderDevice {
 public:
   IRenderDevice() {}
+  virtual ~IRenderDevice() = default;
   [[nodiscard]] virtual ImageHandle CreateImage(const ImageDesc &) = 0;
-  [[nodiscard]] virtual ImageViewHandle CreateImageView(const ImageViewDesc &) = 0;
+  [[nodiscard]] virtual ImageViewHandle
+  CreateImageView(const ImageViewDesc &) = 0;
   [[nodiscard]] virtual BufferHandle CreateBuffer(const BufferDesc &) = 0;
   [[nodiscard]] virtual ShaderModuleHandle
   CreateShaderModule(const ShaderModuleDesc &) = 0;
-  [[nodiscard]] virtual GraphicsPipelineHandle CreatePipeline(const GraphicsPipelineDesc &) = 0;
+  [[nodiscard]] virtual GraphicsPipelineHandle
+  CreatePipeline(const GraphicsPipelineDesc &) = 0;
   [[nodiscard]] virtual std::unique_ptr<IRenderCommandList>
   CreateCommandList(QueueType type) = 0;
-
 
   virtual void Destroy(ImageHandle) = 0;
   virtual void Destroy(ImageViewHandle) = 0;
@@ -23,7 +25,7 @@ public:
   virtual void Destroy(ShaderModuleHandle) = 0;
 
   virtual RenderCapabilities GetCapabilities() const = 0;
-  virtual void Submit(const IRenderCommandList & commandList) = 0;
+  virtual void Submit(const IRenderCommandList &commandList) = 0;
 
 protected:
 };
