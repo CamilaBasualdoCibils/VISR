@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ARUI/Core/Application/Value.hpp"
-#include "ARUI/Language/Document.hpp"
+#include "ARUI/Language/node.hpp"
 #include <cstdint>
 #include <expected>
 #include <functional>

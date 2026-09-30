@@ -2,6 +2,7 @@
 
 #include "ARUI/XR/Display/IViewProvider.hpp"
 #include "ARUI/XR/Display/RenderView.hpp"
+#include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 namespace ARUI::Tools::Simulator {
 class SimulatorViewProvider : public IViewProvider {

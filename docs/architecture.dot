@@ -1,0 +1,68 @@
+digraph ARUIArchitecture {
+  graph [label="ARUI architecture and frame responsibilities" labelloc=t fontsize=22 rankdir=LR compound=true newrank=true];
+  node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=10 color="#50606e" fillcolor="#f8fafc"];
+  edge [fontname="Helvetica" fontsize=9 color="#50606e"];
+  subgraph cluster_content {
+    label="Content and UI semantics"; color="#b8c4ce"; style="rounded,dashed";
+    application [label="Application\nstate, actions, metadata"];
+    language [label="Language\ndocuments, nodes, styles"];
+    runtime [label="Runtime\nlive tree, layout, style,\ninteraction, animation"];
+    scripting [label="Scripting\nscript adapter / bindings"];
+    scripting -> application [label="adapts to"];
+    runtime -> application [label="consumes contract"];
+    runtime -> language [label="resolves document + style"];
+  }
+  subgraph cluster_paint {
+    label="Scene-to-render translation (API-independent)"; color="#78a6c8";
+    paint_node [label="PaintNode\nimmutable layout output" fillcolor="#e8f3fb"];
+    painter [label="IPainter / registry\nstyled node -> render objects" fillcolor="#e8f3fb"];
+    context [label="PaintContext\nsubmission facade" fillcolor="#e8f3fb"];
+    renderer_api [label="IRenderer\nframe + typed Submit API" fillcolor="#e8f3fb"];
+    render_list [label="Effective Render List\nRenderer's typed vectors:\nsurfaces, shapes, curves, text, meshes" fillcolor="#fff4d6"];
+    paint_node -> painter [label=paint];
+    painter -> context [label="Draw*"];
+    context -> renderer_api [label="Submit(...)"];
+    renderer_api -> render_list [label=stores];
+  }
+  subgraph cluster_render {
+    label="Render scheduling and GPU abstraction"; color="#d49b52";
+    renderer [label="Renderer\nbatches objects; builds passes" fillcolor="#fff0dc"];
+    render_graph [label="RenderGraph\npass/resource dependencies;\nCompile + Execute" fillcolor="#fff0dc"];
+    commands [label="IRenderCommandList\nrecords bind / draw / dispatch" fillcolor="#fff0dc"];
+    device [label="IRenderDevice\nresources, pipelines,\ncommand lists + submit" fillcolor="#fff0dc"];
+    backends [label="OpenGL / Vulkan backends" fillcolor="#f8e3ca"];
+    render_list -> renderer [label="owned by" dir=back];
+    renderer -> render_graph [label=BuildRenderGraph];
+    render_graph -> commands [label="records during execution"];
+    render_graph -> device [label="Execute(device)"];
+    device -> commands [label="Create / Submit"];
+    backends -> device [label=implement arrowhead=empty];
+  }
+  subgraph cluster_xr {
+    label="XR contracts (separate responsibilities)"; color="#7caf75";
+    views [label="IViewProvider\nXR view metrics:\nview + projection + viewport" fillcolor="#e7f5e5"];
+    tracking [label="IXRTracker\ntracked poses, joints, events" fillcolor="#e7f5e5"];
+    presentation [label="IPresenter\nframe lifecycle +\nPresent(view, target)" fillcolor="#e7f5e5"];
+    view [label="RenderView\nview/projection/viewport" fillcolor="#eef8ed"];
+    target [label="RenderTargetHandle\nrendered surface identity" fillcolor="#eef8ed"];
+    views -> view [label=provides];
+    presentation -> view [label=consumes];
+    presentation -> target [label=presents];
+  }
+  subgraph cluster_integration {
+    label="Composition roots / implementations"; color="#9b83bd";
+    manager [label="Server/Manager\ncoordinates services" fillcolor="#f0eafa"];
+    desktop [label="Server/Desktop\nselects implementations; frame loop" fillcolor="#f0eafa"];
+    simulator [label="Tools/Simulator\ndev XR implementations" fillcolor="#f0eafa"];
+    openxr [label="XR/OpenXR\nproduction target (planned)" fillcolor="#f0eafa"];
+    desktop -> manager [label=uses];
+    simulator -> { presentation views tracking } [label=implements arrowhead=empty];
+    openxr -> { presentation views tracking } [label=implements arrowhead=empty style=dashed];
+  }
+  runtime -> paint_node [label="layout output" style=dashed];
+  desktop -> { renderer render_graph device presentation } [label="owns / drives"];
+  manager -> { runtime renderer_api views tracking presentation } [label=coordinates style=dashed];
+  views -> renderer [label="one render per view" style=dashed color="#4f8b49"];
+  tracking -> runtime [label="interaction input" style=dashed color="#4f8b49"];
+  renderer -> target [label="renders into" style=dashed color="#b87522"];
+}

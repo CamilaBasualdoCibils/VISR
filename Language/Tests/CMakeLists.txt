@@ -1,4 +1,4 @@
-add_executable(ARUILanguageTests ParserTests.cpp)
+add_executable(ARUILanguageTests ParserTests.cpp NodeTests.cpp)
 find_package(GTest CONFIG REQUIRED)
 
 target_link_libraries(ARUILanguageTests PRIVATE 
@@ -7,4 +7,5 @@ GTest::gtest
 GTest::gtest_main 
 GTest::gmock 
 GTest::gmock_main)
-add_test(NAME ARUILanguageTests COMMAND ARUILanguageTests)
+include(GoogleTest)
+gtest_discover_tests(ARUILanguageTests)

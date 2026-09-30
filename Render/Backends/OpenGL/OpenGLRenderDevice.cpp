@@ -54,16 +54,14 @@ ARUI::Render::OpenGLRenderDevice::CreateImage(const ImageDesc &desc) {
 }
 ARUI::Render::BufferHandle
 ARUI::Render::OpenGLRenderDevice::CreateBuffer(const BufferDesc &desc) {
-  // TODO: Implement this pure virtual method.
   GLBuffer glBuffer;
   glCreateBuffers(1, &glBuffer.id);
-  // for every bit in BufferUsage, map it to the corresponding GLenum using
-  // bufferUsageToGLenum
-  GLenum usage = 0;
-
-  bool success = OpenGL::BufferUsageBitsToGl(desc.usage, usage);
-  assert(success);
-  glBufferStorage(GL_ARRAY_BUFFER, desc.size, nullptr, usage);
+  if (desc.initialData.size_bytes() > desc.size)
+    throw std::invalid_argument("initial buffer data exceeds buffer size");
+  glNamedBufferStorage(glBuffer.id, desc.size,
+                       desc.initialData.empty() ? nullptr
+                                                : desc.initialData.data(),
+                       0);
   BufferHandle handle = GenerateBufferHandle();
   buffers[handle] = glBuffer;
   return handle;
@@ -94,7 +92,8 @@ ARUI::Render::OpenGLRenderDevice::CreatePipeline(
   GLuint vao;
   glCreateVertexArrays(1, &vao);
   for (const auto &binding : graphicsDesc.vertexLayout.bindings) {
-    glVertexBindingDivisor(binding.binding, binding.perInstance ? 1 : 0);
+    glVertexArrayBindingDivisor(vao, binding.binding,
+                                binding.perInstance ? 1 : 0);
   }
 
   for (const auto &attr : graphicsDesc.vertexLayout.attributes) {
@@ -102,12 +101,12 @@ ARUI::Render::OpenGLRenderDevice::CreatePipeline(
     assert(glFormatOpt.has_value());
     const auto glFormat = glFormatOpt.value();
 
-    glEnableVertexAttribArray(attr.location);
+    glEnableVertexArrayAttrib(vao, attr.location);
 
-    glVertexAttribFormat(attr.location, glFormat.componentCount, glFormat.type,
-                         glFormat.normalized, attr.offset);
+    glVertexArrayAttribFormat(vao, attr.location, glFormat.componentCount,
+                              glFormat.type, glFormat.normalized, attr.offset);
 
-    glVertexAttribBinding(attr.location, attr.binding);
+    glVertexArrayAttribBinding(vao, attr.location, attr.binding);
   }
 
   glBindVertexArray(0);
@@ -173,9 +172,9 @@ void ARUI::Render::OpenGLRenderDevice::Destroy(ImageHandle handle) {
   glDeleteTextures(1, &textures[handle].id);
   textures.erase(handle);
 }
-void ARUI::Render::OpenGLRenderDevice::Destroy(BufferHandle) {
-  // TODO: Implement this pure virtual method.
-  assert(false && "Method `DestroyBuffer` is not implemented.");
+void ARUI::Render::OpenGLRenderDevice::Destroy(BufferHandle handle) {
+  glDeleteBuffers(1, &buffers.at(handle).id);
+  buffers.erase(handle);
 }
 std::unique_ptr<ARUI::Render::IRenderCommandList>
 ARUI::Render::OpenGLRenderDevice::CreateCommandList(QueueType type) {

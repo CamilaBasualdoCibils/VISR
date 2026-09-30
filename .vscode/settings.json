@@ -3,6 +3,17 @@
   "cmake.debugConfig": {
     "MIMode": "gdb",
     "miDebuggerPath": "/usr/bin/gdb",
-    "args": []
+    "args": [],
+    "setupCommands": [
+      {
+        "text": "skip -gfi /usr/include/*"
+      },
+      {
+        "text": "skip -gfi */vcpkg_installed/*"
+      },
+      {
+        "text": "skip -rfu ^std::.*"
+      }
+    ]
   }
 }

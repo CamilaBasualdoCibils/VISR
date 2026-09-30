@@ -7,6 +7,7 @@
 #include <functional>
 #include <string_view>
 namespace ARUI::Render {
+class IRenderDevice;
 using RenderGraphResource = FrameGraphResource;
 using GraphTextureDesc = ImageDesc;
 using GraphBufferDesc = BufferDesc;
@@ -92,6 +93,9 @@ public:
                              const typename T::Desc &desc, T &&resource) {
     return m_frameGraph.import(name, desc, std::forward<T>(resource));
   }
+
+  void Compile();
+  void Execute(IRenderDevice &device);
 
 private:
   FrameGraph m_frameGraph;

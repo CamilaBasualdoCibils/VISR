@@ -10,7 +10,7 @@ public:
 
   virtual void BindPipeline(GraphicsPipelineHandle) = 0;
 
-  virtual void BindVertexBuffer(BufferHandle) = 0;
+  virtual void BindVertexBuffer(BufferHandle, uint32_t stride) = 0;
   virtual void BindIndexBuffer(BufferHandle) = 0;
   virtual void BindTexture(uint32_t slot, ImageHandle) = 0;
 

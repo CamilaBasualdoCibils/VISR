@@ -48,6 +48,7 @@ struct SamplerDesc {};
 struct BufferDesc {
   uint32_t size;
   BufferUsage usage;
+  std::span<const std::byte> initialData{};
 };
 struct BufferTag{};
 using BufferHandle = Handle<BufferTag,uint64_t>;

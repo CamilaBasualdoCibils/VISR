@@ -5,9 +5,11 @@
 #include "ARUI/Render/RenderCommons.hpp"
 #include "ARUI/Render/RenderEnums.hpp"
 #include "ARUI/Render/RenderGraph.hpp"
-#include "ShaderRegistry.hpp"
+#include "ARUI/Render/Painter.hpp"
+#include "ARUI/Render/Renderer.hpp"
 #include "ARUI/Tools/Simulator/SimulatorPresenter.hpp"
 #include "ARUI/XR/Display/RenderView.hpp"
+#include "ShaderRegistry.hpp"
 #include "fg/FrameGraphResource.hpp"
 #include "test_frag.hpp"
 #include "test_vert.hpp"
@@ -36,39 +38,30 @@ int ARUI::Server::Manager::AruiDesktop::Run() {
 
   const Render::GraphicsPipelineHandle pipeline = renderDevice->CreatePipeline(
       Render::GraphicsPipelineDesc{.vertexShader = vertShaderModule,
-                                   .fragmentShader = fragShaderModule});
+                                   .fragmentShader = fragShaderModule,
+                                   .vertexLayout = {
+                                       .bindings = {{.binding = 0, .stride = sizeof(glm::vec3)}},
+                                       .attributes = {{.location = 0, .binding = 0,
+                                                       .format = Render::VertexFormat::Float3}}}});
 
-  auto commandList =
-      renderDevice->CreateCommandList(Render::QueueType::Graphics);
-  commandList->BeginRendering(
-      Render::RenderPassDesc{.extent = {800, 600}, .offset = {0, 0}});
-  commandList->BindPipeline(pipeline);
-  commandList->Draw(Render::PrimitiveTopology::Triangles, 3, 0);
-  commandList->EndRendering();
-  struct Pass {
-    Render::RenderGraphResource texture;
-  };
-  /* renderGraph->addPass<Pass>(std::string_view name, const Setup &setup,
-                             const Execute &execute); */
-  /* renderGraph->addPass<Pass>(
-      "PassName",
-      [](Render::RenderGraph::Builder &builder, Pass &data) {
-        data.texture = builder.create<Render::RenderGraphTexture>(
-            "sampleTex", Render::RenderGraphTexture::Desc{
-                             .extent = glm::ivec3{800, 600, 1},
-                             .format = Render::ImageFormat::RGB8});
-        data.texture = builder.write(data.texture);
-      },
-      [&](const Pass &data, FrameGraphPassResources &resources, void *) {
-        commandList->BeginRendering(Render::RenderPassDesc{
-            .colorAttachment =
-                resources.get<Render::RenderGraphTexture>(data.texture).handle},
-            .extent = {800, 600},
-            .offset = {0, 0},
-      }); */
+  Render::Renderer renderer(
+      *renderDevice, {.pipeline = pipeline,
+                      .renderPass = {.extent = {800, 600}, .offset = {0, 0}}});
+  Render::PainterRegistry painterRegistry;
+  Render::RegisterDefaultPainter(painterRegistry);
+  const Render::IPainter *defaultPainter = painterRegistry.Find("default");
+  Render::PaintContext paintContext{renderer};
+  const Render::PaintNode rootNode{
+      .type = Language::LNodeType::Panel, .size = {1.0F, 1.0F}};
   while (!stopRequested) {
     presenter->BeginFrame();
-    renderDevice->Submit(*commandList);
+    renderGraph = std::make_shared<Render::RenderGraph>();
+    renderer.BeginFrame();
+    defaultPainter->Paint(rootNode, {}, paintContext);
+    renderer.BuildRenderGraph(*renderGraph);
+    renderGraph->Compile();
+    renderGraph->Execute(*renderDevice);
+    renderer.EndFrame();
     presenter->Present(RenderView{"Simulator"}, RenderTargetHandle{});
     presenter->EndFrame();
   }

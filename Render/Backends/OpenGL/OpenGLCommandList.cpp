@@ -17,6 +17,14 @@ void ARUI::Render::OpenGLCommandList::BindPipelineCommand::Execute(
   glUseProgram(renderDevice->GetGLPipeline(handle).programId);
   // Implement the execution logic for binding a pipeline.
 }
+void ARUI::Render::OpenGLCommandList::BindVertexBufferCommand::Execute(
+    OpenGLRenderDevice *renderDevice) {
+  glBindVertexBuffer(0, renderDevice->GetGLBuffer(handle).id, 0, stride);
+}
+void ARUI::Render::OpenGLCommandList::BindIndexBufferCommand::Execute(
+    OpenGLRenderDevice *renderDevice) {
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderDevice->GetGLBuffer(handle).id);
+}
 void ARUI::Render::OpenGLCommandList::DrawCommand::Execute(
     OpenGLRenderDevice *renderDevice) {
   std::optional<GLenum> primitive =
@@ -29,4 +37,10 @@ void ARUI::Render::OpenGLCommandList::DrawCommand::Execute(
     assert(false && "Invalid primitive topology.");
   }
   // Implement the execution logic for drawing.
+}
+
+void ARUI::Render::OpenGLCommandList::DrawIndexedCommand::Execute(
+    OpenGLRenderDevice *) {
+  glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indexCount),
+                 GL_UNSIGNED_INT, nullptr);
 }

@@ -5,19 +5,53 @@
 
 namespace ARUI::Language {
 namespace {
+std::string Trim(std::string_view value);
+
+std::optional<LNodeType> NodeType(std::string_view name) {
+  if (name == "surface") return LNodeType::Surface;
+  if (name == "group") return LNodeType::Group;
+  if (name == "row") return LNodeType::Row;
+  if (name == "column") return LNodeType::Column;
+  if (name == "stack") return LNodeType::Stack;
+  if (name == "text") return LNodeType::Text;
+  if (name == "button") return LNodeType::Button;
+  if (name == "panel") return LNodeType::Panel;
+  return std::nullopt;
+}
+
+bool HasOnlyKnownElements(pugi::xml_node node) {
+  if (node.type() == pugi::node_element && !NodeType(node.name()))
+    return false;
+  for (auto child : node.children())
+    if (!HasOnlyKnownElements(child))
+      return false;
+  return true;
+}
+
+AttributeValue ReadAttribute(std::string_view name, std::string value) {
+  if (name == "disabled")
+    return value == "true";
+  if (name == "state")
+    return StateReference{std::move(value)};
+  if (name == "action")
+    return ActionReference{std::move(value)};
+  return value;
+}
+
 LNode ReadNode(pugi::xml_node source) {
-  LNode result;
-  if (source.type() == pugi::node_pcdata || source.type() == pugi::node_cdata) {
-    result.text = source.value();
-    return result;
-  }
-  result.name = source.name();
+  LNode result{.type = *NodeType(source.name())};
   for (auto attribute : source.attributes())
-    result.attributes.push_back({attribute.name(), attribute.value()});
+    result.attributes.insert_or_assign(
+        attribute.name(), ReadAttribute(attribute.name(), attribute.value()));
   for (auto child : source.children()) {
-    if (child.type() == pugi::node_element || child.type() == pugi::node_pcdata ||
-        child.type() == pugi::node_cdata)
+    if (child.type() == pugi::node_element)
       result.children.push_back(ReadNode(child));
+    else if (child.type() == pugi::node_pcdata ||
+             child.type() == pugi::node_cdata) {
+      auto text = Trim(child.value());
+      if (!text.empty())
+        result.children.push_back(LText(std::move(text)));
+    }
   }
   return result;
 }
@@ -157,6 +191,11 @@ ParseResult<Document> ParseMarkup(std::string_view source) {
     }
     diagnostic.message = status.description();
     result.diagnostics.push_back(std::move(diagnostic));
+    return result;
+  }
+  if (!xml.document_element() || !HasOnlyKnownElements(xml.document_element())) {
+    result.diagnostics.push_back(
+        {.message = "unknown or missing ARUI root element"});
     return result;
   }
   result.value.root = ReadNode(xml.document_element());

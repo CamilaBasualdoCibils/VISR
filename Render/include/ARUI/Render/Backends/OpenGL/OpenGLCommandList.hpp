@@ -22,14 +22,12 @@ public:
     commandQueue.push_back(BindPipelineCommand{handle});
   }
 
-  void BindVertexBuffer(BufferHandle handle) override {
-    // TODO: Implement this pure virtual method.
-    assert(false && "Method `BindVertexBuffer` is not implemented.");
+  void BindVertexBuffer(BufferHandle handle, uint32_t stride) override {
+    commandQueue.push_back(BindVertexBufferCommand{handle, stride});
   }
 
   void BindIndexBuffer(BufferHandle handle) override {
-    // TODO: Implement this pure virtual method.
-    assert(false && "Method `BindIndexBuffer` is not implemented.");
+    commandQueue.push_back(BindIndexBufferCommand{handle});
   }
 
   void BindTexture(uint32_t slot, ImageHandle handle) override {
@@ -45,8 +43,7 @@ public:
   }
 
   void DrawIndexed(uint32_t indexCount) override {
-    // TODO: Implement this pure virtual method.
-    assert(false && "Method `DrawIndexed` is not implemented.");
+    commandQueue.push_back(DrawIndexedCommand{indexCount});
   }
 
   void Dispatch(uint32_t x, uint32_t y, uint32_t z) override {
@@ -70,6 +67,15 @@ private:
     GraphicsPipelineHandle handle;
     void Execute(OpenGLRenderDevice *renderDevice);
   };
+  struct BindVertexBufferCommand {
+    BufferHandle handle;
+    uint32_t stride;
+    void Execute(OpenGLRenderDevice *renderDevice);
+  };
+  struct BindIndexBufferCommand {
+    BufferHandle handle;
+    void Execute(OpenGLRenderDevice *renderDevice);
+  };
   struct DrawCommand {
     PrimitiveTopology topology;
     uint32_t vertexCount;
@@ -78,8 +84,14 @@ private:
     uint32_t firstInstance;
     void Execute(OpenGLRenderDevice *renderDevice);
   };
+  struct DrawIndexedCommand {
+    uint32_t indexCount;
+    void Execute(OpenGLRenderDevice *renderDevice);
+  };
   using Command = std::variant<BeginRenderCommand, EndRenderCommand,
-                               BindPipelineCommand, DrawCommand>;
+                               BindPipelineCommand, BindVertexBufferCommand,
+                               BindIndexBufferCommand, DrawCommand,
+                               DrawIndexedCommand>;
   std::vector<Command> commandQueue;
 
 protected:

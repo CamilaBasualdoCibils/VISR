@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(cmake/FindDeps.cmake)
 include(CTest)
 include(cmake/CompileShaders.cmake)
+enable_testing()
 add_spirv_shader_library(
     TARGET ARUI_OpenGLShaders
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/Server/res/Shaders/OpenGL"

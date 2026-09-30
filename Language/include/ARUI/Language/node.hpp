@@ -1,4 +1,6 @@
 
+#pragma once
+
 #include "ARUI/Language/AttributeValue.hpp"
 #include "ARUI/Language/Style.hpp"
 #include <boost/describe/class.hpp>
@@ -88,24 +90,11 @@ template <typename Options> Attributes AttributesFrom(const Options &options) {
 // ============================================================
 
 struct SurfaceOptions {
-  std::optional<std::string> shape;
-
-  std::optional<Length> width;
-  std::optional<Length> height;
-
-  std::optional<Length> radius;
-  std::optional<Angle> arc;
-
   std::optional<std::string> anchor;
-
-  std::optional<Length> xOffset;
-  std::optional<Length> yOffset;
-  std::optional<Length> zOffset;
 };
 
 BOOST_DESCRIBE_STRUCT(SurfaceOptions, (),
-                      (shape, width, height, radius, arc, anchor, xOffset,
-                       yOffset, zOffset))
+                      (anchor))
 
 inline LNode LSurface(std::vector<LNode> children = {},
                       SurfaceOptions options = {}, Style style = {}) {
@@ -233,11 +222,9 @@ inline LNode LText(StateReference state, TextOptions options = {},
 
 struct ButtonOptions {
   std::optional<bool> disabled;
-  std::optional<Length> width;
-  std::optional<Length> height;
 };
 
-BOOST_DESCRIBE_STRUCT(ButtonOptions, (), (disabled, width, height))
+BOOST_DESCRIBE_STRUCT(ButtonOptions, (), (disabled))
 
 inline LNode LButton(ActionReference action, std::vector<LNode> children = {},
                      ButtonOptions options = {}, Style style = {}) {
@@ -260,12 +247,9 @@ inline LNode LButton(ActionReference action, std::vector<LNode> children = {},
 struct PanelOptions {
   std::optional<std::string> name;
   std::optional<std::string> script;
-
-  std::optional<Length> width;
-  std::optional<Length> height;
 };
 
-BOOST_DESCRIBE_STRUCT(PanelOptions, (), (name, script, width, height))
+BOOST_DESCRIBE_STRUCT(PanelOptions, (), (name, script))
 
 inline LNode LPanel(std::vector<LNode> children = {}, PanelOptions options = {},
                     Style style = {}) {

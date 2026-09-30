@@ -8,7 +8,51 @@ int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-//TEST
+
+TEST(Parser, ProducesTypedLanguageNodesAndSemanticAttributes) {
+  auto parsed = ParseMarkup(
+      R"(<surface anchor="wrist"><panel name="Map" script="Maps/Map.js"><button action="Map/Open" disabled="true"/></panel></surface>)");
+  ASSERT_TRUE(parsed);
+  EXPECT_EQ(parsed.value.root.type, LNodeType::Surface);
+  EXPECT_EQ(*parsed.value.root.GetAttribute<std::string>("anchor"), "wrist");
+  const auto &panel = parsed.value.root.children.at(0);
+  EXPECT_EQ(panel.type, LNodeType::Panel);
+  EXPECT_EQ(*panel.GetAttribute<std::string>("script"), "Maps/Map.js");
+  const auto &button = panel.children.at(0);
+  EXPECT_EQ(button.GetAttribute<ActionReference>("action")->value, "Map/Open");
+  EXPECT_TRUE(*button.GetAttribute<bool>("disabled"));
+}
+
+TEST(Parser, TypedMarkupSurvivesSerialization) {
+  Document source{LSurface(
+      {LPanel({LText(StateReference{"Music/Title"})},
+              {.name = "Player", .script = "Player.js"})},
+      {.anchor = "left-forearm"})};
+  const auto reparsed = ParseMarkup(SerializeMarkup(source));
+  ASSERT_TRUE(reparsed);
+  EXPECT_EQ(reparsed.value.root.type, LNodeType::Surface);
+  EXPECT_EQ(reparsed.value.root.children.at(0).type, LNodeType::Panel);
+  EXPECT_EQ(reparsed.value.root.children.at(0)
+                .children.at(0)
+                .GetAttribute<StateReference>("state")
+                ->value,
+            "Music/Title");
+}
+
+TEST(Parser, RejectsUnknownNodeTypesCleanly) {
+  const auto parsed = ParseMarkup("<application/>");
+  EXPECT_FALSE(parsed);
+  ASSERT_FALSE(parsed.diagnostics.empty());
+}
+
+TEST(Parser, StyleSheetRoundTripsUnchanged) {
+  const auto parsed =
+      ParseStyles("surface { width: 50cm; painter: ascii; }");
+  ASSERT_TRUE(parsed);
+  const auto reparsed = ParseStyles(SerializeStyles(parsed.value));
+  ASSERT_TRUE(reparsed);
+  EXPECT_EQ(reparsed.value, parsed.value);
+}
 //  constexpr std::string_view markup =
 //      R"(<app id="music"><templates><template id="default"><panel><text value="$track.title"/><button>Play &amp; pause</button></panel></template></templates></app>)";
 //  auto document = ParseMarkup(markup);

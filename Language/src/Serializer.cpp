@@ -1,16 +1,39 @@
 #include "ARUI/Language/Serializer.hpp"
 #include <pugixml.hpp>
+#include <type_traits>
 
 namespace ARUI::Language {
 namespace {
-void WriteNode(pugi::xml_node parent, const LNode &node) {
-  if (node.name.empty()) {
-    parent.append_child(pugi::node_pcdata).set_value(node.text.c_str());
-    return;
+const char *NodeName(LNodeType type) {
+  switch (type) {
+  case LNodeType::Surface: return "surface";
+  case LNodeType::Group: return "group";
+  case LNodeType::Row: return "row";
+  case LNodeType::Column: return "column";
+  case LNodeType::Stack: return "stack";
+  case LNodeType::Text: return "text";
+  case LNodeType::Button: return "button";
+  case LNodeType::Panel: return "panel";
   }
-  auto element = parent.append_child(node.name.c_str());
-  for (const auto &attribute : node.attributes)
-    element.append_attribute(attribute.name.c_str()).set_value(attribute.value.c_str());
+  return "group";
+}
+
+std::string AttributeText(const AttributeValue &value) {
+  return std::visit([]<typename T>(const T &v) -> std::string {
+    if constexpr (std::is_same_v<T, bool>) return v ? "true" : "false";
+    else if constexpr (std::is_same_v<T, int64_t> ||
+                       std::is_same_v<T, double>) return std::to_string(v);
+    else if constexpr (std::is_same_v<T, std::string>) return v;
+    else if constexpr (std::is_same_v<T, StateReference> ||
+                       std::is_same_v<T, ActionReference>) return v.value;
+    else return std::to_string(v.value);
+  }, value);
+}
+
+void WriteNode(pugi::xml_node parent, const LNode &node) {
+  auto element = parent.append_child(NodeName(node.type));
+  for (const auto &[name, value] : node.attributes)
+    element.append_attribute(name.c_str()).set_value(AttributeText(value).c_str());
   for (const auto &child : node.children) WriteNode(element, child);
 }
 } // namespace

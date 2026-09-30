@@ -1,23 +1,12 @@
 #pragma once
+#include "ARUI/Language/node.hpp"
 #include <string>
 #include <vector>
 
 namespace ARUI::Language {
-struct Attribute {
-  std::string name, value;
-  bool operator==(const Attribute &) const = default;
-};
-struct LNode {
-  // Text nodes have an empty name and store their contents in text.
-  std::string name, text;
-  std::vector<Attribute> attributes;
-  std::vector<LNode> children;
-  bool operator==(const LNode &) const = default;
-};
-struct Document {
-  LNode root;
-  bool operator==(const Document &) const = default;
-};
+struct LDocument { LNode root; };
+using Document = LDocument;
+
 struct Declaration {
   std::string property, value;
   bool operator==(const Declaration &) const = default;

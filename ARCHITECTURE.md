@@ -42,4 +42,24 @@ Server
 
 The dependency direction is from integration layers toward contracts:
 
+## Responsibility graph
+
+The detailed Graphviz source is [`docs/architecture.dot`](docs/architecture.dot).
+Render it with:
+
+```sh
+dot -Tsvg docs/architecture.dot -o docs/architecture.svg
+```
+
+The XR boundary deliberately separates three responsibilities:
+
+- `IViewProvider` supplies per-view metrics: view/projection matrices and viewport.
+- `IXRTracker` supplies tracked poses, joints, and events.
+- `IPresenter` owns the frame/presentation lifecycle and displays a render target.
+
+There is no standalone `RenderList` class today. The graph labels the typed
+per-frame vectors owned by `Renderer` as the effective render list, without
+implying an interface that does not exist. Solid edges describe current code;
+dashed edges describe intended integration or data flow that is not wired yet.
+
 
