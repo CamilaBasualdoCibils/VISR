@@ -1,0 +1,103 @@
+<arui>
+    <style>
+    .player {
+        width: fit-content;
+        height: fit-content;
+
+        padding: 1cm;
+        gap: 8mm;
+
+        align-self: center;
+
+        painter: glass;
+    }
+
+    .title {
+        font-size: 12mm;
+    }
+
+    .controls {
+        gap: 5mm;
+    }
+
+    .control {
+        width: fit-content;
+        height: fit-content;
+
+        padding: 5mm;
+
+        painter: glass;
+    }
+
+    .focused {
+        painter: highlight;
+    }
+    </style>
+
+
+    <script type="module">
+    function gazeHighlight(node) {
+        if (eye.isOver(node))
+            node.addClass("focused");
+        else
+            node.removeClass("focused");
+    }
+
+    export function previous(node) {
+        gazeHighlight(node);
+
+        if (hand.isTouching(node))
+            app.invoke("previous");
+    }
+
+    export function play(node) {
+        gazeHighlight(node);
+
+        if (hand.isTouching(node))
+            app.invoke("play");
+    }
+
+    export function next(node) {
+        gazeHighlight(node);
+
+        if (hand.isTouching(node))
+            app.invoke("next");
+    }
+    </script>
+
+
+    <surface width="40cm" height="25cm">
+
+        <panel class="player">
+
+            <column>
+
+                <text class="title">Music</text>
+
+                <column>
+                    <text state="track.artist" />
+                    <text state="track.title" />
+                </column>
+
+                <row class="controls">
+
+                    <panel class="control" behavior="previous">
+                        <text>Previous</text>
+                    </panel>
+
+                    <panel class="control" behavior="play">
+                        <text state="playback.label" />
+                    </panel>
+
+                    <panel class="control" behavior="next">
+                        <text>Next</text>
+                    </panel>
+
+                </row>
+
+            </column>
+
+        </panel>
+
+    </surface>
+</arui>

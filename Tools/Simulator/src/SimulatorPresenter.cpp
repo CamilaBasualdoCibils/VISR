@@ -411,7 +411,6 @@ bool SimulatorPresenter::DrawLanguageNodeEditor(Language::LNode &node,
     };
     static constexpr std::array unitChoices = {
         UnitChoice{Language::LengthUnit::Auto, "Auto"},
-        UnitChoice{Language::LengthUnit::Pixel, "px"},
         UnitChoice{Language::LengthUnit::Millimeter, "mm"},
         UnitChoice{Language::LengthUnit::Centimeter, "cm"},
         UnitChoice{Language::LengthUnit::Meter, "m"},

@@ -1,0 +1,69 @@
+<arui>
+    <style>
+    .player {
+        width: fit-content;
+        height: fit-content;
+
+        padding: 1cm;
+        gap: 8mm;
+
+        align-self: center;
+
+        painter: glass;
+    }
+
+    .title {
+        font-size: 12mm;
+    }
+
+    .subtitle {
+        font-size: 6mm;
+    }
+
+    .controls {
+        gap: 5mm;
+    }
+
+    .control {
+        width: fit-content;
+        height: fit-content;
+
+        padding: 5mm;
+
+        painter: glass;
+    }
+    </style>
+
+
+    <surface width="40cm" height="25cm">
+
+        <panel class="player">
+            <column>
+
+                <text class="title">Music</text>
+
+                <column>
+                    <text class="subtitle">Now Playing</text>
+                    <text>Resonance — HOME</text>
+                </column>
+
+                <row class="controls">
+
+                    <panel class="control">
+                        <text>Previous</text>
+                    </panel>
+
+                    <panel class="control">
+                        <text>Play</text>
+                    </panel>
+
+                    <panel class="control">
+                        <text>Next</text>
+                    </panel>
+
+                </row>
+            </column>
+        </panel>
+
+    </surface>
+</arui>

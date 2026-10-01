@@ -5,7 +5,7 @@ using namespace ARUI::Language;
 
 TEST(NodeStyle, PresentationIsStoredSeparatelyFromAttributes) {
   Style style;
-  style.width = Length{120, LengthUnit::Pixel};
+  style.width = Length{120, LengthUnit::Millimeter};
   auto button =
       LButton(ActionReference{"submit"}, {}, {.disabled = true}, style);
   EXPECT_FALSE(button.HasAttribute("width"));
@@ -13,7 +13,7 @@ TEST(NodeStyle, PresentationIsStoredSeparatelyFromAttributes) {
   EXPECT_EQ(button.GetAttribute<ActionReference>("action")->value, "submit");
   ASSERT_FALSE(button.style.width.IsAuto());
   EXPECT_EQ(button.style.width.value, 120);
-  EXPECT_EQ(button.style.width.unit, LengthUnit::Pixel);
+  EXPECT_EQ(button.style.width.unit, LengthUnit::Millimeter);
 }
 
 TEST(NodeStyle, SurfacePresentationAndSemanticsAreSeparated) {
@@ -67,4 +67,16 @@ TEST(NodeStyle, DimensionsDefaultToAutoAndCanHoldExplicitLengths) {
   ASSERT_FALSE(style.width.IsAuto());
   EXPECT_EQ(style.width.value, 75);
   EXPECT_EQ(style.width.unit, LengthUnit::Percent);
+}
+
+TEST(NodeStyle, FontSizeResolvesFromSpecifiedInheritedAndDefaultValues) {
+  Style style;
+  EXPECT_EQ(ResolveFontSize(style),
+            (Length{5.0, LengthUnit::Millimeter}));
+
+  const Length inherited{8.0, LengthUnit::Millimeter};
+  EXPECT_EQ(ResolveFontSize(style, inherited), inherited);
+
+  style.fontSize = Length{12.0, LengthUnit::Millimeter};
+  EXPECT_EQ(ResolveFontSize(style, inherited), *style.fontSize);
 }

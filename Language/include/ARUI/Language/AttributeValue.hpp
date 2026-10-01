@@ -16,7 +16,6 @@ struct ActionReference {
 
 enum class LengthUnit {
     Auto,
-    Pixel,
     Millimeter,
     Centimeter,
     Meter,

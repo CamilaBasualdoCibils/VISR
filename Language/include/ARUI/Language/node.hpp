@@ -29,6 +29,7 @@ enum class LNodeType {
   Stack,
 
   Text,
+  Image,
   Button,
 
   Panel
@@ -216,6 +217,27 @@ inline LNode LText(StateReference state, TextOptions options = {},
 
   return {
       .type = LNodeType::Text,
+      .attributes = std::move(attributes),
+      .style = std::move(style),
+  };
+}
+
+// ============================================================
+// Image
+// ============================================================
+
+struct ImageOptions {
+  std::optional<std::string> alt;
+};
+
+BOOST_DESCRIBE_STRUCT(ImageOptions, (), (alt))
+
+inline LNode LImage(std::string source, ImageOptions options = {},
+                    Style style = {}) {
+  auto attributes = AttributesFrom(options);
+  attributes.insert_or_assign("src", std::move(source));
+  return {
+      .type = LNodeType::Image,
       .attributes = std::move(attributes),
       .style = std::move(style),
   };

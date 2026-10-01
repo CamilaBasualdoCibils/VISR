@@ -1,0 +1,5 @@
+<arui>
+    <surface width="20cm" height="10cm">
+        <text>Hello, ARUI!</text>
+    </surface>
+</arui>

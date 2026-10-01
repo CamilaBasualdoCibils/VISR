@@ -1,102 +1,139 @@
 #include "ARUI/Language/Parser.hpp"
 #include "ARUI/Language/Serializer.hpp"
-#include <iostream>
-#include <string_view>
 #include <gtest/gtest.h>
+#include <string_view>
 using namespace ARUI::Language;
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
+
+namespace {
+const LNode &OnlySurface(const ParseResult<Document> &parsed) {
+  return parsed.value.surfaces.at(0);
+}
 }
 
-TEST(Parser, ProducesTypedLanguageNodesAndSemanticAttributes) {
-  auto parsed = ParseMarkup(
-      R"(<surface anchor="wrist"><panel name="Map" script="Maps/Map.js"><button action="Map/Open" disabled="true"/></panel></surface>)");
+TEST(Parser, ParsesMinimalDocumentAndPreservesText) {
+  const auto parsed = ParseARUI(R"(<arui>
+    <surface width="20cm" height="10cm"><text>Hello, ARUI!</text></surface>
+  </arui>)");
+  ASSERT_TRUE(parsed) << parsed.diagnostics.front().message;
+  ASSERT_EQ(parsed.value.surfaces.size(), 1u);
+  const auto &surface = OnlySurface(parsed);
+  EXPECT_EQ(surface.style.width, (Length{20, LengthUnit::Centimeter}));
+  EXPECT_EQ(surface.style.height, (Length{10, LengthUnit::Centimeter}));
+  ASSERT_EQ(surface.children.size(), 1u);
+  EXPECT_EQ(surface.children[0].type, LNodeType::Text);
+  EXPECT_EQ(*surface.children[0].GetAttribute<std::string>("text"), "Hello, ARUI!");
+  EXPECT_TRUE(surface.children[0].children.empty());
+}
+
+TEST(Parser, PreservesNestedHierarchyAndIgnoresCommentsAndWhitespace) {
+  const auto parsed = ParseMarkup(R"(<arui><!-- document -->
+    <surface width="1m" height="250mm"><column><text>Hello</text>
+      <row><panel><text>A</text></panel><panel><text>B</text></panel></row>
+    </column></surface></arui>)");
   ASSERT_TRUE(parsed);
-  EXPECT_EQ(parsed.value.root.type, LNodeType::Surface);
-  EXPECT_EQ(*parsed.value.root.GetAttribute<std::string>("anchor"), "wrist");
-  const auto &panel = parsed.value.root.children.at(0);
-  EXPECT_EQ(panel.type, LNodeType::Panel);
-  EXPECT_EQ(*panel.GetAttribute<std::string>("script"), "Maps/Map.js");
-  const auto &button = panel.children.at(0);
-  EXPECT_EQ(button.GetAttribute<ActionReference>("action")->value, "Map/Open");
-  EXPECT_TRUE(*button.GetAttribute<bool>("disabled"));
+  const auto &column = OnlySurface(parsed).children.at(0);
+  EXPECT_EQ(column.type, LNodeType::Column);
+  ASSERT_EQ(column.children.size(), 2u);
+  EXPECT_EQ(column.children[1].type, LNodeType::Row);
+  ASSERT_EQ(column.children[1].children.size(), 2u);
+  EXPECT_EQ(column.children[1].children[0].type, LNodeType::Panel);
 }
 
-TEST(Parser, TypedMarkupSurvivesSerialization) {
-  Document source{LSurface(
-      {LPanel({LText(StateReference{"Music/Title"})},
-              {.name = "Player", .script = "Player.js"})},
-      {.anchor = "left-forearm"})};
-  const auto reparsed = ParseMarkup(SerializeMarkup(source));
-  ASSERT_TRUE(reparsed);
-  EXPECT_EQ(reparsed.value.root.type, LNodeType::Surface);
-  EXPECT_EQ(reparsed.value.root.children.at(0).type, LNodeType::Panel);
-  EXPECT_EQ(reparsed.value.root.children.at(0)
-                .children.at(0)
-                .GetAttribute<StateReference>("state")
-                ->value,
-            "Music/Title");
+TEST(Parser, ParsesMultipleSurfacesAndAllPhysicalUnits) {
+  const auto parsed = ParseMarkup(R"(<arui>
+    <surface width="20mm" height="10cm"/>
+    <surface width="2m" height="30mm"/>
+  </arui>)");
+  ASSERT_TRUE(parsed);
+  ASSERT_EQ(parsed.value.surfaces.size(), 2u);
+  EXPECT_EQ(parsed.value.surfaces[0].style.width.unit, LengthUnit::Millimeter);
+  EXPECT_EQ(parsed.value.surfaces[0].style.height.unit, LengthUnit::Centimeter);
+  EXPECT_EQ(parsed.value.surfaces[1].style.width.unit, LengthUnit::Meter);
 }
 
-TEST(Parser, RejectsUnknownNodeTypesCleanly) {
-  const auto parsed = ParseMarkup("<application/>");
+TEST(Parser, ExtractsStylesScriptsAndBehavior) {
+  const auto parsed = ParseMarkup(R"(<arui>
+    <style>.control { padding: 5mm; }</style>
+    <script type="module">export function play(node) {}</script>
+    <surface width="40cm" height="25cm"><panel class="control" behavior="play"/></surface>
+  </arui>)");
+  ASSERT_TRUE(parsed);
+  ASSERT_EQ(parsed.value.stylesheets.size(), 1u);
+  EXPECT_NE(parsed.value.stylesheets[0].find("padding: 5mm"), std::string::npos);
+  ASSERT_EQ(parsed.value.scripts.size(), 1u);
+  EXPECT_EQ(parsed.value.scripts[0].type, "module");
+  EXPECT_NE(parsed.value.scripts[0].source.find("function play"), std::string::npos);
+  const auto &panel = OnlySurface(parsed).children.at(0);
+  EXPECT_EQ(*panel.GetAttribute<std::string>("behavior"), "play");
+}
+
+TEST(Parser, ParsesStateAsTypedReferenceAndImageNode) {
+  const auto parsed = ParseMarkup(R"(<arui><surface width="1m" height="1m">
+    <text state="system.cpu"/><image src="meter.png" alt="meter"/>
+  </surface></arui>)");
+  ASSERT_TRUE(parsed);
+  const auto &children = OnlySurface(parsed).children;
+  EXPECT_EQ(children[0].GetAttribute<StateReference>("state")->value, "system.cpu");
+  EXPECT_EQ(children[1].type, LNodeType::Image);
+}
+
+class InvalidLength : public testing::TestWithParam<const char *> {};
+TEST_P(InvalidLength, RejectsUnsupportedUnit) {
+  const auto parsed = ParseMarkup(std::string("<arui><surface width=\"1") +
+      GetParam() + "\" height=\"1m\"/></arui>");
   EXPECT_FALSE(parsed);
   ASSERT_FALSE(parsed.diagnostics.empty());
+  EXPECT_NE(parsed.diagnostics[0].message.find("unsupported"), std::string::npos);
+}
+INSTANTIATE_TEST_SUITE_P(UnsupportedUnits, InvalidLength,
+                         testing::Values("px", "em", "rem"));
+
+TEST(Parser, RejectsMissingSurfaceWidthAndHeight) {
+  auto missingWidth = ParseMarkup("<arui><surface height=\"1m\"/></arui>");
+  EXPECT_FALSE(missingWidth);
+  EXPECT_NE(missingWidth.diagnostics[0].message.find("width"), std::string::npos);
+  auto missingHeight = ParseMarkup("<arui><surface width=\"1m\"/></arui>");
+  EXPECT_FALSE(missingHeight);
+  EXPECT_NE(missingHeight.diagnostics[0].message.find("height"), std::string::npos);
+}
+
+TEST(Parser, RejectsInvalidRootUnknownNodesAndTopLevelElements) {
+  EXPECT_FALSE(ParseMarkup("<surface width=\"1m\" height=\"1m\"/>"));
+  auto unknown = ParseMarkup("<arui><surface width=\"1m\" height=\"1m\"><slider/></surface></arui>");
+  EXPECT_FALSE(unknown);
+  EXPECT_NE(unknown.diagnostics[0].message.find("slider"), std::string::npos);
+  auto top = ParseMarkup("<arui><metadata/></arui>");
+  EXPECT_FALSE(top);
+  EXPECT_NE(top.diagnostics[0].message.find("metadata"), std::string::npos);
+}
+
+TEST(Parser, RejectsInvalidAttributesExternalScriptsAndMalformedXml) {
+  auto attribute = ParseMarkup("<arui><surface width=\"1m\" height=\"1m\"><row bogus=\"x\"/></surface></arui>");
+  EXPECT_FALSE(attribute);
+  EXPECT_NE(attribute.diagnostics[0].message.find("bogus"), std::string::npos);
+  auto external = ParseMarkup("<arui><script src=\"./test.js\"/></arui>");
+  EXPECT_FALSE(external);
+  EXPECT_NE(external.diagnostics[0].message.find("./test.js"), std::string::npos);
+  auto malformed = ParseMarkup("<arui><surface></arui>");
+  EXPECT_FALSE(malformed);
+  EXPECT_NE(malformed.diagnostics[0].message.find("XML syntax error"), std::string::npos);
+  EXPECT_GT(malformed.diagnostics[0].column, 0u);
+}
+
+TEST(Parser, MarkupRoundTripsAsAruiDocument) {
+  const auto parsed = ParseMarkup(R"(<arui><style>panel { gap: 1mm; }</style>
+    <surface width="40cm" height="25cm"><text>Hello</text></surface></arui>)");
+  ASSERT_TRUE(parsed);
+  const auto reparsed = ParseMarkup(SerializeMarkup(parsed.value));
+  ASSERT_TRUE(reparsed) << reparsed.diagnostics[0].message;
+  ASSERT_EQ(reparsed.value.surfaces.size(), 1u);
+  EXPECT_EQ(*reparsed.value.surfaces[0].children[0].GetAttribute<std::string>("text"), "Hello");
 }
 
 TEST(Parser, StyleSheetRoundTripsUnchanged) {
-  const auto parsed =
-      ParseStyles("surface { width: 50cm; painter: ascii; }");
+  const auto parsed = ParseStyles("surface { width: 50cm; painter: ascii; }");
   ASSERT_TRUE(parsed);
   const auto reparsed = ParseStyles(SerializeStyles(parsed.value));
   ASSERT_TRUE(reparsed);
   EXPECT_EQ(reparsed.value, parsed.value);
 }
-//  constexpr std::string_view markup =
-//      R"(<app id="music"><templates><template id="default"><panel><text value="$track.title"/><button>Play &amp; pause</button></panel></template></templates></app>)";
-//  auto document = ParseMarkup(markup);
-//  if (!document || document.value.root.name != "app" ||
-//      document.value.root.attributes.at(0).value != "music") {
-//    std::cerr << "markup parse failed\n";
-//    return 1;
-//  }
-//  auto markupRoundTrip = ParseMarkup(SerializeMarkup(document.value));
-//  if (!markupRoundTrip || markupRoundTrip.value != document.value) {
-//    std::cerr << "markup round trip failed\n";
-//    return 1;
-//  }
-//  if (ParseMarkup("<app><panel></app>")) {
-//    std::cerr << "mismatched markup accepted\n";
-//    return 1;
-//  }
-//
-//  constexpr std::string_view styles = R"(/* surface */
-//#player {
-//  width: 50cm;
-//  surface: cylinder { radius: 80cm; arc: 60deg; };
-//  follow: spring(120, 20);
-//}
-//button:hover { transform: translate-z(3mm); }
-//)";
-//  auto sheet = ParseStyles(styles);
-//  if (!sheet || sheet.value.rules.size() != 2 ||
-//      sheet.value.rules.at(0).declarations.size() != 3 ||
-//      sheet.value.rules.at(0).declarations.at(1).value !=
-//          "cylinder { radius: 80cm; arc: 60deg; }") {
-//    std::cerr << "style parse failed\n";
-//    return 1;
-//  }
-//  auto styleRoundTrip = ParseStyles(SerializeStyles(sheet.value));
-//  if (!styleRoundTrip || styleRoundTrip.value != sheet.value) {
-//    std::cerr << "style round trip failed\n";
-//    return 1;
-//  }
-//  auto invalid = ParseStyles("panel { width: 2cm;");
-//  if (invalid || invalid.diagnostics.empty() ||
-//      invalid.diagnostics.at(0).line != 1) {
-//    std::cerr << "missing style diagnostic\n";
-//    return 1;
-//  }
-//  return 0;
-//}

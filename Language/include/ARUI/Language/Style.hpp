@@ -14,6 +14,12 @@
 namespace ARUI::Language {
 
 
+struct LayoutParameters {
+  Length fontSize{5.0, LengthUnit::Millimeter};
+};
+
+inline constexpr LayoutParameters DefaultLayoutParameters{};
+
 struct PainterReference {
   std::string name;
   bool operator==(const PainterReference &) const = default;
@@ -55,6 +61,9 @@ struct Style {
   std::optional<Length> padding;
   std::optional<Length> gap;
 
+  // Inherited. ResolveFontSize applies the project default when unspecified.
+  std::optional<Length> fontSize;
+
   // Surface-local translation, resolved before the surface is painted.
   std::optional<Length> xOffset;
   std::optional<Length> yOffset;
@@ -74,6 +83,12 @@ struct Style {
   std::optional<PainterReference> painter;
   PainterStyleProperties painterProperties;
 };
+
+[[nodiscard]] constexpr Length
+ResolveFontSize(const Style &style,
+                Length inherited = DefaultLayoutParameters.fontSize) noexcept {
+  return style.fontSize.value_or(inherited);
+}
 
 [[nodiscard]] PainterStyleType TypeOf(const PainterStyleValue &value) noexcept;
 

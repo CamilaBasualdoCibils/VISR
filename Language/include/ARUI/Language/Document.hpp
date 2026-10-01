@@ -4,8 +4,19 @@
 #include <vector>
 
 namespace ARUI::Language {
-struct LDocument { LNode root; };
+struct EmbeddedScript {
+  std::string type;
+  std::string source;
+  bool operator==(const EmbeddedScript &) const = default;
+};
+
+struct LDocument {
+  std::vector<LNode> surfaces;
+  std::vector<std::string> stylesheets;
+  std::vector<EmbeddedScript> scripts;
+};
 using Document = LDocument;
+using ARUIDocument = LDocument;
 
 struct Declaration {
   std::string property, value;

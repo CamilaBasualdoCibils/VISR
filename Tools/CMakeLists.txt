@@ -1,1 +1,2 @@
 add_subdirectory(Simulator)
+add_subdirectory(MarkupViewer)
