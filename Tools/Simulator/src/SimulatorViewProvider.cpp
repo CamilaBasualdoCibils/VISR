@@ -31,8 +31,8 @@ void SimulatorViewProvider::BeginFrame() {
   leftEye.position -= leftEye.Right() * eyeOffset;
   rightEye.position += rightEye.Right() * eyeOffset;
   views_[0] = MakeView("Debug Camera", debugCamera_);
-  views_[1] = MakeView("Left Eye", leftEye);
-  views_[2] = MakeView("Right Eye", rightEye);
+  views_[1] = tracker_->GetEyeView(0).value_or(MakeView("Left Eye", leftEye));
+  views_[2] = tracker_->GetEyeView(1).value_or(MakeView("Right Eye", rightEye));
 }
 
 } // namespace ARUI::Tools::Simulator

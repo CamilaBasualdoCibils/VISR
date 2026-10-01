@@ -147,6 +147,7 @@ struct RenderPassDesc {
   ImageViewHandle depthAttachment;
 
   bool clearColor = false;
+  glm::vec4 clearColorValue{0.08F, 0.09F, 0.12F, 1.0F};
   bool clearDepth = false;
   glm::uvec2 extent;
   glm::uvec2 offset;

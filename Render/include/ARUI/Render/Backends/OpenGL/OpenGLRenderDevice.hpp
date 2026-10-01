@@ -34,6 +34,7 @@ public:
 
   OpenGLRenderDevice();
   ~OpenGLRenderDevice() override;
+  void MakeCurrent() const { ActivateContext(); }
   ImageHandle CreateImage(const ImageDesc &desc) override;
 
   BufferHandle CreateBuffer(const BufferDesc &desc) override;

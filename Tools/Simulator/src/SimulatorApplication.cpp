@@ -6,7 +6,12 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <span>
+#include <thread>
+#include <string>
+#include <vector>
+#include <glm/geometric.hpp>
 
 namespace ARUI::Tools::Simulator {
 namespace {
@@ -34,6 +39,23 @@ float Meters(const Language::Length &length, float fallback) {
   return Meters(std::optional<Language::Length>{length}, fallback);
 }
 
+float InsetMeters(const std::optional<Language::Length> &length,
+                  float containingWidth) {
+  if (!length || length->IsAuto())
+    return 0.0F;
+  const float reference = length->unit == Language::LengthUnit::Percent
+                              ? containingWidth : 0.0F;
+  return std::max(0.0F, Meters(length, reference));
+}
+
+float Radians(const std::optional<Language::Angle> &angle) {
+  if (!angle)
+    return 0.0F;
+  const float value = static_cast<float>(angle->value);
+  return angle->unit == Language::AngleUnit::Degree ? glm::radians(value)
+                                                    : value;
+}
+
 Render::MeshRenderObject MakeQuad(const RenderView &view, glm::vec3 center,
                                   glm::vec3 right, glm::vec3 up, float width,
                                   float height) {
@@ -42,16 +64,161 @@ Render::MeshRenderObject MakeQuad(const RenderView &view, glm::vec3 center,
   const std::array worldPositions = {
       center - horizontal - vertical, center + horizontal - vertical,
       center + horizontal + vertical, center - horizontal + vertical};
-  constexpr std::array<uint32_t, 6> indices = {0, 1, 2, 2, 3, 0};
-  Render::MeshGeometry geometry;
-  geometry.indices.assign(indices.begin(), indices.end());
-  geometry.positions.reserve(worldPositions.size());
+  // This temporary pipeline accepts NDC positions, so clip in homogeneous
+  // coordinates before dividing by w. Dividing a vertex behind the eye first
+  // turns a near-plane crossing into an enormous screen-space triangle.
   const glm::mat4 viewProjection = view.projection * view.view;
-  for (const glm::vec3 position : worldPositions) {
-    const glm::vec4 clip = viewProjection * glm::vec4(position, 1.0F);
+  std::vector<glm::vec4> polygon;
+  polygon.reserve(worldPositions.size());
+  for (const glm::vec3 position : worldPositions)
+    polygon.push_back(viewProjection * glm::vec4(position, 1.0F));
+
+  struct ClipPlane {
+    glm::vec4 equation;
+    float minimum;
+  };
+  const std::array clipPlanes = {
+      ClipPlane{{0.0F, 0.0F, 0.0F, 1.0F}, 1.0e-5F},
+      ClipPlane{{0.0F, 0.0F, 1.0F, 1.0F}, 0.0F},
+      ClipPlane{{0.0F, 0.0F, -1.0F, 1.0F}, 0.0F},
+      ClipPlane{{1.0F, 0.0F, 0.0F, 1.0F}, 0.0F},
+      ClipPlane{{-1.0F, 0.0F, 0.0F, 1.0F}, 0.0F},
+      ClipPlane{{0.0F, 1.0F, 0.0F, 1.0F}, 0.0F},
+      ClipPlane{{0.0F, -1.0F, 0.0F, 1.0F}, 0.0F}};
+  for (const ClipPlane &plane : clipPlanes) {
+    if (polygon.empty())
+      break;
+    std::vector<glm::vec4> clipped;
+    clipped.reserve(polygon.size() + 1);
+    glm::vec4 previous = polygon.back();
+    float previousDistance =
+        glm::dot(plane.equation, previous) - plane.minimum;
+    for (const glm::vec4 &current : polygon) {
+      const float currentDistance =
+          glm::dot(plane.equation, current) - plane.minimum;
+      const bool previousInside = previousDistance >= 0.0F;
+      const bool currentInside = currentDistance >= 0.0F;
+      if (previousInside != currentInside) {
+        const float t =
+            previousDistance / (previousDistance - currentDistance);
+        clipped.push_back(previous + t * (current - previous));
+      }
+      if (currentInside)
+        clipped.push_back(current);
+      previous = current;
+      previousDistance = currentDistance;
+    }
+    polygon = std::move(clipped);
+  }
+
+  Render::MeshGeometry geometry;
+  if (polygon.size() < 3)
+    return {.geometry = std::move(geometry)};
+  geometry.positions.reserve(polygon.size());
+  for (const glm::vec4 &clip : polygon)
     geometry.positions.emplace_back(glm::vec3{clip} / clip.w);
+  for (uint32_t i = 1; i + 1 < polygon.size(); ++i) {
+    geometry.indices.push_back(0);
+    geometry.indices.push_back(i);
+    geometry.indices.push_back(i + 1);
   }
   return {.geometry = std::move(geometry)};
+}
+
+void SubmitTrackedHands(Render::Renderer &renderer, const RenderView &view,
+                        SimulatorXRTracker &tracker) {
+  static constexpr std::array<std::string_view, 26> joints = {
+      "palm", "wrist", "thumb_metacarpal", "thumb_proximal", "thumb_distal",
+      "thumb_tip", "index_metacarpal", "index_proximal",
+      "index_intermediate", "index_distal", "index_tip", "middle_metacarpal",
+      "middle_proximal", "middle_intermediate", "middle_distal", "middle_tip",
+      "ring_metacarpal", "ring_proximal", "ring_intermediate", "ring_distal",
+      "ring_tip", "little_metacarpal", "little_proximal",
+      "little_intermediate", "little_distal", "little_tip"};
+  static constexpr std::array<std::pair<size_t, size_t>, 25> bones = {{
+      {1, 0}, {0, 2}, {2, 3}, {3, 4}, {4, 5},
+      {0, 6}, {6, 7}, {7, 8}, {8, 9}, {9, 10},
+      {0, 11}, {11, 12}, {12, 13}, {13, 14}, {14, 15},
+      {0, 16}, {16, 17}, {17, 18}, {18, 19}, {19, 20},
+      {0, 21}, {21, 22}, {22, 23}, {23, 24}, {24, 25}}};
+  const glm::vec3 cameraRight = glm::vec3{
+      glm::inverse(view.view)[0]};
+  const glm::vec3 cameraUp = glm::vec3{
+      glm::inverse(view.view)[1]};
+  for (size_t hand = 0; hand < 2; ++hand) {
+    if (!tracker.IsHandTracked(hand))
+      continue;
+    std::array<std::optional<TrackedPose>, joints.size()> poses;
+    const std::string prefix = hand == 0 ? "left_hand_" : "right_hand_";
+    for (size_t joint = 0; joint < joints.size(); ++joint)
+      poses[joint] = tracker.GetPose(prefix + std::string(joints[joint]));
+    for (const auto &[start, end] : bones) {
+      if (!poses[start] || !poses[end] ||
+          !poses[start]->positionValid || !poses[end]->positionValid)
+        continue;
+      const glm::vec3 from = poses[start]->pose.position;
+      const glm::vec3 to = poses[end]->pose.position;
+      const glm::vec3 axis = to - from;
+      const float length = glm::length(axis);
+      if (length < 0.001F)
+        continue;
+      glm::vec3 side = glm::cross(glm::normalize(axis), cameraRight);
+      if (glm::length(side) < 0.1F)
+        side = glm::cross(glm::normalize(axis), cameraUp);
+      side = glm::normalize(side);
+      renderer.Submit(MakeQuad(view, (from + to) * 0.5F,
+                               glm::normalize(axis), side, length, 0.008F));
+    }
+    for (const auto &joint : poses) {
+      if (!joint || !joint->positionValid)
+        continue;
+      renderer.Submit(MakeQuad(view, joint->pose.position,
+                               cameraRight, cameraUp, 0.014F, 0.014F));
+    }
+  }
+}
+
+void SubmitTrackedBody(Render::Renderer &renderer, const RenderView &view,
+                       SimulatorXRTracker &tracker) {
+  if (!tracker.IsBodyTracked())
+    return;
+  const size_t count = tracker.GetBodyJointCount();
+  std::vector<std::optional<TrackedPose>> poses(count);
+  for (size_t joint = 0; joint < count; ++joint)
+    poses[joint] = tracker.GetBodyJointPose(joint);
+  const glm::mat4 cameraWorld = glm::inverse(view.view);
+  const glm::vec3 cameraRight = glm::vec3{cameraWorld[0]};
+  const glm::vec3 cameraUp = glm::vec3{cameraWorld[1]};
+  for (size_t joint = 0; joint < count; ++joint) {
+    const auto &pose = poses[joint];
+    if (!pose || !pose->positionValid)
+      continue;
+    // The hand tracker already draws fingers at a finer resolution.
+    if (joint < 18 || joint >= 70 ||
+        !tracker.IsHandTracked(joint < 44 ? 0 : 1))
+      renderer.Submit(MakeQuad(view, pose->pose.position,
+                               cameraRight, cameraUp, 0.022F, 0.022F));
+    const int32_t parent = tracker.GetBodyJointParent(joint);
+    if (parent < 0 || static_cast<size_t>(parent) >= count ||
+        !poses[parent] || !poses[parent]->positionValid)
+      continue;
+    // Avoid drawing the same fingers twice when separate hand tracking is active.
+    if (joint >= 18 && joint < 70 &&
+        tracker.IsHandTracked(joint < 44 ? 0 : 1))
+      continue;
+    const glm::vec3 from = poses[parent]->pose.position;
+    const glm::vec3 to = pose->pose.position;
+    const glm::vec3 axis = to - from;
+    const float length = glm::length(axis);
+    if (length < 0.001F)
+      continue;
+    glm::vec3 side = glm::cross(glm::normalize(axis), cameraRight);
+    if (glm::length(side) < 0.1F)
+      side = glm::cross(glm::normalize(axis), cameraUp);
+    side = glm::normalize(side);
+    renderer.Submit(MakeQuad(view, (from + to) * 0.5F,
+                             glm::normalize(axis), side, length, 0.012F));
+  }
 }
 
 void SubmitRuntimeTree(Render::Renderer &renderer,
@@ -79,13 +246,19 @@ void SubmitRuntimeTree(Render::Renderer &renderer,
     }
     const glm::vec3 center =
         anchor.position + anchor.orientation * glm::vec3{x, y, z};
-    const glm::vec3 right = anchor.Right();
-    const glm::vec3 up = anchor.Up();
-    const glm::vec3 towardViewer = -anchor.Forward();
+    Pose surfacePose = anchor;
+    surfacePose.orientation = glm::normalize(
+        anchor.orientation * glm::quat(glm::vec3{
+            Radians(surface->style.xRotation),
+            Radians(surface->style.yRotation),
+            Radians(surface->style.zRotation)}));
+    const glm::vec3 right = surfacePose.Right();
+    const glm::vec3 up = surfacePose.Up();
+    const glm::vec3 towardViewer = -surfacePose.Forward();
     const float width = Meters(surface->style.width, 1.2F);
     const float height = Meters(surface->style.height, 0.7F);
     const float surfacePadding =
-        std::max(0.0F, Meters(surface->style.padding, 0.0F));
+        InsetMeters(surface->style.padding, width);
 
     constexpr float border = 0.018F;
     renderer.Submit(
@@ -102,7 +275,7 @@ void SubmitRuntimeTree(Render::Renderer &renderer,
       if (!panel || !panel->visible)
         continue;
       const float panelMargin =
-          std::max(0.0F, Meters(panel->style.margin, 0.0F));
+          InsetMeters(panel->style.margin, width);
       const float panelWidth = Meters(
           panel->style.width,
           std::max(0.05F, width - 2.0F * (surfacePadding + panelMargin)));
@@ -114,7 +287,7 @@ void SubmitRuntimeTree(Render::Renderer &renderer,
           MakeQuad(view, panelCenter, right, up, panelWidth, panelHeight));
 
       const float panelPadding =
-          std::max(0.0F, Meters(panel->style.padding, 0.0F));
+          InsetMeters(panel->style.padding, panelWidth);
       for (const Runtime::NodeID childID : panel->children) {
         const Runtime::RNode *child = runtime.Get(childID);
         if (child && child->visible &&
@@ -137,15 +310,20 @@ SimulatorApplication::SimulatorApplication()
       presenter_(std::make_shared<SimulatorPresenter>(tracker_, views_)),
       renderDevice_(std::make_shared<Render::OpenGLRenderDevice>()) {
   presenter_->SetRenderDevice(renderDevice_);
+  renderDevice_->MakeCurrent();
+  tracker_->InitializeOpenXR();
 }
 
 int SimulatorApplication::Run() {
   constexpr glm::uvec2 extent{800, 600};
+  const std::array<glm::uvec2, 3> imageExtents = {
+      extent, glm::uvec2{tracker_->GetEyeExtent(0)},
+      glm::uvec2{tracker_->GetEyeExtent(1)}};
   std::array<Render::ImageHandle, 3> images;
   std::array<Render::ImageViewHandle, 3> imageViews;
   for (std::size_t i = 0; i < images.size(); ++i) {
     images[i] = renderDevice_->CreateImage(
-        {.extent = {extent.x, extent.y, 1},
+        {.extent = {imageExtents[i].x, imageExtents[i].y, 1},
          .format = Render::ImageFormat::R8G8B8A8_UNORM,
          .usage = static_cast<Render::ImageUsage>(
                       Render::ImageUsageFlags::ColorAttachment) |
@@ -174,7 +352,10 @@ int SimulatorApplication::Run() {
                             .binding = 0,
                             .format = Render::VertexFormat::Float3}}},
        .colorFormats = {Render::ImageFormat::R8G8B8A8_UNORM}});
-
+  using Clock = std::chrono::steady_clock;
+  const auto framePeriod = std::chrono::duration_cast<Clock::duration>(
+      std::chrono::duration<double>{1.0 / 90.0});
+  auto nextFrame = Clock::now();
   while (!presenter_->ShouldClose()) {
     tracker_->PollEvents();
     views_->BeginFrame();
@@ -197,19 +378,37 @@ int SimulatorApplication::Run() {
           *renderDevice_, {.pipeline = pipeline,
                            .renderPass = {.colorAttachment = imageViews[i],
                                           .clearColor = true,
-                                          .extent = extent,
+                                          .clearColorValue =
+                                              i != 0 && tracker_->IsPassthroughEnabled()
+                                                  ? glm::vec4{0.0F}
+                                                  : glm::vec4{0.08F, 0.09F, 0.12F, 1.0F},
+                                          .extent = imageExtents[i],
                                           .offset = {0, 0}}});
       Render::RenderGraph graph;
       renderer.BeginFrame();
       SubmitRuntimeTree(renderer, runtimeTree_, frameViews[i], *tracker_);
+      if (tracker_->DrawSkeletons()) {
+        SubmitTrackedHands(renderer, frameViews[i], *tracker_);
+        SubmitTrackedBody(renderer, frameViews[i], *tracker_);
+      }
       renderer.BuildRenderGraph(graph);
       graph.Compile();
       graph.Execute(*renderDevice_);
       renderer.EndFrame();
       presenter_->Present(frameViews[i], imageViews[i]);
     }
+    renderDevice_->MakeCurrent();
+    tracker_->PresentToHeadset({
+        renderDevice_->GetGLTextureView(imageViews[1]).id,
+        renderDevice_->GetGLTextureView(imageViews[2]).id});
     presenter_->EndFrame();
     views_->EndFrame();
+    nextFrame += framePeriod;
+    const auto now = Clock::now();
+    if (nextFrame > now)
+      std::this_thread::sleep_until(nextFrame);
+    else
+      nextFrame = now;
   }
 
   renderDevice_->Destroy(pipeline);

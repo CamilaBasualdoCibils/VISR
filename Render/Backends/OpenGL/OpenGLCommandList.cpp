@@ -33,8 +33,7 @@ void ARUI::Render::OpenGLCommandList::BeginRenderCommand::Execute(
   }
   glViewport(desc.offset.x, desc.offset.y, desc.extent.x, desc.extent.y);
   if (desc.clearColor) {
-    constexpr GLfloat clear[] = {0.08F, 0.09F, 0.12F, 1.0F};
-    glClearBufferfv(GL_COLOR, 0, clear);
+    glClearBufferfv(GL_COLOR, 0, &desc.clearColorValue.x);
   }
 }
 

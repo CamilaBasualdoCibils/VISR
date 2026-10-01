@@ -55,10 +55,15 @@ struct Style {
   std::optional<Length> padding;
   std::optional<Length> gap;
 
-  // Layout resolves spatial presentation before a painter is invoked.
+  // Surface-local translation, resolved before the surface is painted.
   std::optional<Length> xOffset;
   std::optional<Length> yOffset;
   std::optional<Length> zOffset;
+
+  // Local Euler rotation of a surface, applied after its anchor orientation.
+  std::optional<Angle> xRotation;
+  std::optional<Angle> yRotation;
+  std::optional<Angle> zRotation;
 
   std::optional<std::string> shape;
   std::optional<Length> radius;

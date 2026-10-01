@@ -8,6 +8,7 @@
 #include <implot.h>
 #include <spdlog/spdlog.h>
 #include <stdexcept>
+#include <string>
 
 namespace {
 ARUI::Language::LNode MakeDefaultDocument() {
@@ -62,7 +63,7 @@ SimulatorPresenter::SimulatorPresenter(
   if (!window)
     throw std::runtime_error("GLFW failed to create the simulator window");
   glfwMakeContextCurrent(window);
-  glfwSwapInterval(1);
+  glfwSwapInterval(0);
   ImGui::CreateContext();
   ImPlot::CreateContext();
   ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -192,11 +193,94 @@ void SimulatorPresenter::DrawTrackedPoseEditor(const char *label,
 void SimulatorPresenter::DrawTrackingInspector() {
   ImGui::SetNextWindowSize({350.0F, 600.0F}, ImGuiCond_FirstUseEver);
   if (ImGui::Begin("Tracking & Poses")) {
-    ImGui::TextDisabled("Values update all simulated views immediately.");
+    if (tracker_->HasOpenXR()) {
+      bool useOpenXR = tracker_->UseOpenXR();
+      if (ImGui::Checkbox("Use OpenXR tracking", &useOpenXR))
+        tracker_->SetUseOpenXR(useOpenXR);
+      ImGui::TextDisabled(tracker_->IsOpenXRRunning()
+                              ? "OpenXR headset connected"
+                              : "OpenXR headset detected; waiting for session");
+    } else {
+      ImGui::TextDisabled("Manual tracking (no OpenXR EGL headset found)");
+    }
+    if (ImGui::Button(tracker_->DrawSkeletons() ? "Hide skeletons"
+                                                : "Show skeletons"))
+      tracker_->SetDrawSkeletons(!tracker_->DrawSkeletons());
+    ImGui::SeparatorText("Environment");
+    bool passthrough = tracker_->IsPassthroughEnabled();
+    ImGui::BeginDisabled(!tracker_->SupportsPassthrough());
+    if (ImGui::Checkbox("Passthrough in headset", &passthrough))
+      tracker_->SetPassthroughEnabled(passthrough);
+    ImGui::EndDisabled();
+    if (!tracker_->SupportsPassthrough())
+      ImGui::TextDisabled("Passthrough unavailable on this runtime");
+    ImGui::TextDisabled(tracker_->SupportsDepth()
+                            ? "Environment depth available (not rendered)"
+                            : "Environment depth unavailable");
     ImGui::Separator();
-    DrawTrackedPoseEditor("Head", tracker_->Head());
-    DrawTrackedPoseEditor("Left Hand", tracker_->LeftHand());
-    DrawTrackedPoseEditor("Right Hand", tracker_->RightHand());
+    const bool live = tracker_->UseOpenXR() && tracker_->IsOpenXRRunning();
+    const auto drawTracked = [&](const char *label, TrackedPose &pose) {
+      const bool driven = live && pose.positionValid && pose.orientationValid;
+      if (driven)
+        ImGui::BeginDisabled();
+      DrawTrackedPoseEditor(label, pose);
+      if (driven)
+        ImGui::EndDisabled();
+    };
+    drawTracked("Head", tracker_->Head());
+    drawTracked("Left Hand", tracker_->LeftHand());
+    drawTracked("Right Hand", tracker_->RightHand());
+    if (tracker_->SupportsHandTracking()) {
+      ImGui::SeparatorText("Articulated Hands");
+      for (size_t hand = 0; hand < 2; ++hand) {
+        const char *side = hand == 0 ? "Left" : "Right";
+        ImGui::PushID(static_cast<int>(hand));
+        const bool tracked = tracker_->IsHandTracked(hand);
+        if (ImGui::TreeNode(side, "%s hand: %s", side,
+                            tracked ? "tracking" : "inactive")) {
+          if (tracked) {
+            for (const char *joint : {"palm", "wrist", "thumb_tip", "index_tip",
+                                      "middle_tip", "ring_tip", "little_tip"}) {
+              const std::string name =
+                  std::string(hand == 0 ? "left_hand_" : "right_hand_") + joint;
+              const auto pose = tracker_->GetPose(name);
+              if (pose && pose->positionValid)
+                ImGui::Text("%s: %.3f, %.3f, %.3f m", joint,
+                            pose->pose.position.x, pose->pose.position.y,
+                            pose->pose.position.z);
+            }
+          }
+          ImGui::TreePop();
+        }
+        ImGui::PopID();
+      }
+    } else {
+      ImGui::SeparatorText("Articulated Hands");
+      ImGui::TextDisabled("Unavailable from the OpenXR runtime");
+    }
+    ImGui::SeparatorText("Body Tracking");
+    if (tracker_->SupportsBodyTracking()) {
+      const bool active = tracker_->IsBodyTracked();
+      ImGui::Text("%s - %zu joints, confidence %.2f",
+                  active ? "Tracking" : "Inactive",
+                  tracker_->GetBodyJointCount(),
+                  tracker_->GetBodyConfidence());
+      if (ImGui::TreeNode("Body joints")) {
+        for (size_t joint = 0; joint < tracker_->GetBodyJointCount(); ++joint) {
+          const auto pose = tracker_->GetBodyJointPose(joint);
+          if (!pose || !pose->positionValid)
+            continue;
+          const auto name = tracker_->GetBodyJointName(joint);
+          ImGui::Text("%.*s: %.3f, %.3f, %.3f m",
+                      static_cast<int>(name.size()), name.data(),
+                      pose->pose.position.x, pose->pose.position.y,
+                      pose->pose.position.z);
+        }
+        ImGui::TreePop();
+      }
+    } else {
+      ImGui::TextDisabled("Unavailable from the OpenXR runtime");
+    }
     ImGui::SeparatorText("Cameras");
     DrawPoseEditor("Debug Camera", views_->DebugCamera());
   }
@@ -288,21 +372,24 @@ bool SimulatorPresenter::DrawLanguageNodeEditor(Language::LNode &node,
         ImGui::EndCombo();
       }
 
-      static constexpr std::array anchors = {"world", "head", "left_hand",
-                                              "right_hand"};
       const auto *storedAnchor = node.GetAttribute<std::string>("anchor");
       const char *anchor = storedAnchor ? storedAnchor->c_str() : "world";
+      std::array<std::string_view, 3 + 2 * 26 + 84> trackedAnchors{};
+      const size_t anchorCount = tracker_->GetJoints(trackedAnchors);
       ImGui::SetNextItemWidth(-1.0F);
       if (ImGui::BeginCombo("Anchor", anchor)) {
-        for (const char *candidate : anchors) {
+        const auto selectAnchor = [&](std::string_view candidate) {
           const bool selected = std::string_view{anchor} == candidate;
-          if (ImGui::Selectable(candidate, selected) && !selected) {
+          if (ImGui::Selectable(candidate.data(), selected) && !selected) {
             node.SetAttribute("anchor", std::string{candidate});
             documentChangedThisFrame_ = true;
           }
           if (selected)
             ImGui::SetItemDefaultFocus();
-        }
+        };
+        selectAnchor("world");
+        for (size_t i = 0; i < anchorCount; ++i)
+          selectAnchor(trackedAnchors[i]);
         ImGui::EndCombo();
       }
     }
@@ -427,6 +514,23 @@ bool SimulatorPresenter::DrawLanguageNodeEditor(Language::LNode &node,
       drawLengthValue(size, false);
       ImGui::PopID();
     };
+    auto editRotation = [this, &beginStyleRow](
+                            const char *label,
+                            std::optional<Language::Angle> &angle) {
+      beginStyleRow(label);
+      float degrees = angle
+                          ? (angle->unit == Language::AngleUnit::Degree
+                                 ? static_cast<float>(angle->value)
+                                 : glm::degrees(static_cast<float>(angle->value)))
+                          : 0.0F;
+      ImGui::SetNextItemWidth(-1.0F);
+      if (ImGui::DragFloat("##Value", &degrees, 0.25F, -180.0F, 180.0F,
+                           "%.1f deg")) {
+        angle = Language::Angle{degrees, Language::AngleUnit::Degree};
+        documentChangedThisFrame_ = true;
+      }
+      ImGui::PopID();
+    };
 
     ImGui::SeparatorText("Style");
     if (ImGui::BeginTable("StyleFields", 2,
@@ -443,9 +547,14 @@ bool SimulatorPresenter::DrawLanguageNodeEditor(Language::LNode &node,
       editLength("Margin", node.style.margin);
       editLength("Padding", node.style.padding);
       editLength("Gap", node.style.gap);
-      editLength("X Offset", node.style.xOffset);
-      editLength("Y Offset", node.style.yOffset);
-      editLength("Z Offset", node.style.zOffset);
+      if (node.type == Language::LNodeType::Surface) {
+        editLength("X Offset", node.style.xOffset);
+        editLength("Y Offset", node.style.yOffset);
+        editLength("Z Offset", node.style.zOffset);
+        editRotation("X Rotation", node.style.xRotation);
+        editRotation("Y Rotation", node.style.yRotation);
+        editRotation("Z Rotation", node.style.zRotation);
+      }
       ImGui::EndTable();
     }
 
