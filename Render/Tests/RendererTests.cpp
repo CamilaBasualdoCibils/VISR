@@ -1,15 +1,16 @@
 #include "ARUI/Render/Font.hpp"
 #include "ARUI/Render/IRenderDevice.hpp"
-#include "ARUI/Render/Renderer.hpp"
 #include "ARUI/Render/RenderGraph.hpp"
-#include "ARUI/Render/RuntimePainter.hpp"
+#include "ARUI/Render/Renderer.hpp"
+#include "ARUI/Runtime/Painter.hpp"
+#include "ARUI/Runtime/RuntimePainter.hpp"
 #include "ARUI/Runtime/RuntimeTree.hpp"
-#include "ARUI/Render/Painter.hpp"
 
 #include <algorithm>
 #include <gtest/gtest.h>
 
 using namespace ARUI::Render;
+using namespace ARUI::Runtime;
 
 namespace {
 struct RecordedCommands {
@@ -28,10 +29,10 @@ public:
   void BindVertexBuffer(BufferHandle, uint32_t) override {
     ++record.bindVertexBufferCount;
   }
-  void BindIndexBuffer(BufferHandle) override {
-    ++record.bindIndexBufferCount;
+  void BindIndexBuffer(BufferHandle) override { ++record.bindIndexBufferCount; }
+  void BindTexture(uint32_t, ImageHandle) override {
+    ++record.bindTextureCount;
   }
-  void BindTexture(uint32_t, ImageHandle) override { ++record.bindTextureCount; }
   void Draw(PrimitiveTopology, uint32_t vertexCount, uint32_t, uint32_t,
             uint32_t) override {
     ++record.drawCount;
@@ -85,8 +86,12 @@ public:
 class SemanticRecorder final : public IRenderer {
 public:
   void BeginFrame() override {}
-  void FillPath(const FillPathRenderObject &path) override { fills.push_back(path); }
-  void StrokePath(const StrokePathRenderObject &path) override { strokes.push_back(path); }
+  void FillPath(const FillPathRenderObject &path) override {
+    fills.push_back(path);
+  }
+  void StrokePath(const StrokePathRenderObject &path) override {
+    strokes.push_back(path);
+  }
   void Submit(const SurfaceRenderObject &) override { ++surfaces; }
   void Submit(const ShapeRenderObject &) override { ++shapes; }
   void Submit(const CurveRenderObject &) override { ++curves; }
@@ -114,9 +119,10 @@ TEST(Renderer, CollectsEveryHighLevelPrimitiveWithoutImmediateGpuWork) {
   renderer.Submit(ShapeRenderObject{.geometry = RectangleShape{}});
   renderer.Submit(CurveRenderObject{});
   renderer.Submit(TextRenderObject{.text = "ARUI"});
-  renderer.Submit(MeshRenderObject{.geometry = {
-      .positions = {{-0.5F, -0.5F, 0.0F}, {0.5F, -0.5F, 0.0F},
-                    {0.0F, 0.5F, 0.0F}}}});
+  renderer.Submit(
+      MeshRenderObject{.geometry = {.positions = {{-0.5F, -0.5F, 0.0F},
+                                                  {0.5F, -0.5F, 0.0F},
+                                                  {0.0F, 0.5F, 0.0F}}}});
   const auto counts = renderer.SubmissionCounts();
   EXPECT_EQ(counts.surfaces, 1);
   EXPECT_EQ(counts.shapes, 1);
@@ -132,9 +138,10 @@ TEST(Renderer, BuildsDeferredRenderGraphWork) {
   Renderer renderer(device, Configuration());
   RenderGraph graph;
   renderer.BeginFrame();
-  renderer.Submit(MeshRenderObject{.geometry = {
-      .positions = {{-0.5F, -0.5F, 0.0F}, {0.5F, -0.5F, 0.0F},
-                    {0.0F, 0.5F, 0.0F}}}});
+  renderer.Submit(
+      MeshRenderObject{.geometry = {.positions = {{-0.5F, -0.5F, 0.0F},
+                                                  {0.5F, -0.5F, 0.0F},
+                                                  {0.0F, 0.5F, 0.0F}}}});
   renderer.BuildRenderGraph(graph);
   EXPECT_EQ(device.createdCommandLists, 0);
   EXPECT_EQ(device.submitCount, 0);
@@ -173,12 +180,13 @@ TEST(Renderer, BatchesRectanglesAndTriangleMeshesIntoOneIndexedDraw) {
   Renderer renderer(device, Configuration());
   RenderGraph graph;
   renderer.BeginFrame();
-  renderer.Submit(ShapeRenderObject{
-      .geometry = RectangleShape{.size = {2.0F, 1.0F}}});
-  renderer.Submit(MeshRenderObject{.geometry = {
-      .positions = {{0.0F, 0.0F, 0.0F}, {1.0F, 0.0F, 0.0F},
-                    {0.0F, 1.0F, 0.0F}},
-      .indices = {0, 1, 2}}});
+  renderer.Submit(
+      ShapeRenderObject{.geometry = RectangleShape{.size = {2.0F, 1.0F}}});
+  renderer.Submit(
+      MeshRenderObject{.geometry = {.positions = {{0.0F, 0.0F, 0.0F},
+                                                  {1.0F, 0.0F, 0.0F},
+                                                  {0.0F, 1.0F, 0.0F}},
+                                    .indices = {0, 1, 2}}});
   renderer.BuildRenderGraph(graph);
   graph.Compile();
   graph.Execute(device);
@@ -206,13 +214,14 @@ TEST(Renderer, EnforcesFrameSubmissionLifecycle) {
 
 TEST(PainterRegistry, RegistersAndFindsDefaultPainter) {
   PainterRegistry registry;
-  RegisterDefaultPainter(registry);
+  RegisterFlatPainter(registry);
   const auto *painter = registry.Find("default");
   ASSERT_NE(painter, nullptr);
   ASSERT_NE(painter->StyleSchema().Find("fill"), nullptr);
   ASSERT_NE(painter->StyleSchema().Find("stroke"), nullptr);
   ASSERT_NE(painter->StyleSchema().Find("stroke-width"), nullptr);
-  EXPECT_EQ(registry.Find("arui:default"), painter);
+  EXPECT_EQ(registry.Find("arui-flat-painter"), painter);
+  EXPECT_EQ(registry.Default(), painter);
   EXPECT_TRUE(painter->StyleSchema().Accepts(
       "fill", ARUI::Language::PainterStyleValue{std::string{"none"}}));
   EXPECT_EQ(registry.Find("missing"), nullptr);
@@ -220,8 +229,8 @@ TEST(PainterRegistry, RegistersAndFindsDefaultPainter) {
 
 TEST(PainterRegistry, RejectsDuplicateRegistration) {
   PainterRegistry registry;
-  RegisterDefaultPainter(registry);
-  EXPECT_THROW(RegisterDefaultPainter(registry), std::logic_error);
+  RegisterFlatPainter(registry);
+  EXPECT_THROW(RegisterFlatPainter(registry), std::logic_error);
 }
 
 TEST(Font, RasterizesNotoSansUtf8ToCoverageBitmap) {
@@ -243,8 +252,8 @@ TEST(Renderer, DrawsSubmittedTextAsUploadedBitmapQuad) {
   Renderer renderer(device, configuration);
   RenderGraph graph;
   renderer.BeginFrame();
-  renderer.Submit(TextRenderObject{.text = "Hello, ARUI!",
-                                   .fontSizePixels = 36.0F});
+  renderer.Submit(
+      TextRenderObject{.text = "Hello, ARUI!", .fontSizePixels = 36.0F});
   renderer.BuildRenderGraph(graph);
   graph.Compile();
   graph.Execute(device);
@@ -259,16 +268,15 @@ TEST(DefaultPainter, PlainTextEmitsTextWithoutBackgroundBox) {
   RecordingDevice device;
   Renderer renderer(device, Configuration());
   PainterRegistry registry;
-  RegisterDefaultPainter(registry);
+  RegisterFlatPainter(registry);
   renderer.BeginFrame();
   PaintContext context{renderer};
   ARUI::Language::Attributes attributes{{"text", std::string{"Hello, ARUI!"}}};
-  registry.Find("default")->Paint(
-      {.type = ARUI::Language::LNodeType::Text,
-       .attributes = &attributes,
-       .fontSizePixels = 36.0F,
-       .fontFamily = "Noto Sans"},
-      {}, context);
+  registry.Find("default")->Paint({.type = ARUI::Language::LNodeType::Text,
+                                   .attributes = &attributes,
+                                   .fontSizePixels = 36.0F,
+                                   .fontFamily = "Noto Sans"},
+                                  {}, context);
   EXPECT_EQ(renderer.SubmissionCounts().text, 1u);
   EXPECT_EQ(renderer.SubmissionCounts().shapes, 0u);
   renderer.EndFrame();
@@ -278,8 +286,8 @@ namespace {
 const IPainter &PanelPainter() {
   static PainterRegistry registry;
   static const IPainter *painter = [] {
-    RegisterDefaultPainter(registry);
-    return registry.Find("arui:default");
+    RegisterFlatPainter(registry);
+    return registry.Find("arui-flat-painter");
   }();
   return *painter;
 }
@@ -317,8 +325,8 @@ TEST(DefaultPanelPainter, StrokeIsOneClosedPathInPhysicalUnits) {
   PanelPainter().Paint(
       PanelNode(),
       {{"stroke", white},
-       {"stroke-width", ARUI::Language::Length{
-                            2.0, ARUI::Language::LengthUnit::Millimeter}}},
+       {"stroke-width",
+        ARUI::Language::Length{2.0, ARUI::Language::LengthUnit::Millimeter}}},
       context);
   ASSERT_EQ(renderer.strokes.size(), 1u);
   const auto &stroke = renderer.strokes[0];
@@ -329,9 +337,9 @@ TEST(DefaultPanelPainter, StrokeIsOneClosedPathInPhysicalUnits) {
   EXPECT_TRUE(std::holds_alternative<LineTo>(stroke.path.commands[2]));
   EXPECT_TRUE(std::holds_alternative<LineTo>(stroke.path.commands[3]));
   EXPECT_TRUE(std::holds_alternative<ClosePath>(stroke.path.commands[4]));
-  EXPECT_EQ(stroke.style.width,
-            (ARUI::Language::Length{2.0,
-                                    ARUI::Language::LengthUnit::Millimeter}));
+  EXPECT_EQ(
+      stroke.style.width,
+      (ARUI::Language::Length{2.0, ARUI::Language::LengthUnit::Millimeter}));
   EXPECT_EQ(renderer.shapes, 0u);
   EXPECT_EQ(renderer.meshes, 0u);
 }
@@ -342,9 +350,10 @@ TEST(DefaultPanelPainter, FillAndStrokeEmitIndependentConcepts) {
   const ARUI::Language::Color color{{0.5F, 0.5F, 0.5F, 1.0F}};
   PanelPainter().Paint(
       PanelNode(),
-      {{"fill", color}, {"stroke", color},
-       {"stroke-width", ARUI::Language::Length{
-                            1.0, ARUI::Language::LengthUnit::Centimeter}}},
+      {{"fill", color},
+       {"stroke", color},
+       {"stroke-width",
+        ARUI::Language::Length{1.0, ARUI::Language::LengthUnit::Centimeter}}},
       context);
   EXPECT_EQ(renderer.fills.size(), 1u);
   EXPECT_EQ(renderer.strokes.size(), 1u);
@@ -357,8 +366,8 @@ TEST(DefaultPanelPainter, ZeroWidthStrokeEmitsNothing) {
   PanelPainter().Paint(
       PanelNode(),
       {{"stroke", white},
-       {"stroke-width", ARUI::Language::Length{
-                            0.0, ARUI::Language::LengthUnit::Millimeter}}},
+       {"stroke-width",
+        ARUI::Language::Length{0.0, ARUI::Language::LengthUnit::Millimeter}}},
       context);
   EXPECT_TRUE(renderer.strokes.empty());
 }
@@ -370,12 +379,12 @@ TEST(SemanticPath, PreservesCubicCurvesWithoutFlattening) {
       .Close();
   SemanticRecorder renderer;
   renderer.FillPath({.path = path,
-                     .style = {.fill = SolidFill{
-                         ARUI::Language::Color{{1.0F, 1.0F, 1.0F, 1.0F}}}}});
+                     .style = {.fill = SolidFill{ARUI::Language::Color{
+                                   {1.0F, 1.0F, 1.0F, 1.0F}}}}});
   ASSERT_EQ(renderer.fills.size(), 1u);
   ASSERT_EQ(renderer.fills[0].path.commands.size(), 3u);
-  EXPECT_TRUE(std::holds_alternative<CubicTo>(
-      renderer.fills[0].path.commands[1]));
+  EXPECT_TRUE(
+      std::holds_alternative<CubicTo>(renderer.fills[0].path.commands[1]));
   EXPECT_EQ(renderer.meshes, 0u);
 }
 
@@ -412,13 +421,13 @@ TEST(RuntimePainter, TraversesRuntimeTreeThroughRegisteredSemanticPainters) {
   transaction.Commit();
 
   PainterRegistry painters;
-  RegisterDefaultPainter(painters);
+  RegisterFlatPainter(painters);
   SemanticRecorder renderer;
   PaintContext context{renderer};
   ASSERT_EQ(runtime.RootChildren().size(), 1u);
-  PaintRuntimeSurface(context, painters, runtime, runtime.RootChildren()[0],
-                      {.localToClip = glm::mat4{1.0F},
-                       .pixelsPerMeter = 1000.0F});
+  PaintRuntimeSurface(
+      context, painters, runtime, runtime.RootChildren()[0],
+      {.localToClip = glm::mat4{1.0F}, .pixelsPerMeter = 1000.0F});
   EXPECT_EQ(renderer.fills.size(), 1u);
   EXPECT_EQ(renderer.texts, 1u);
   EXPECT_EQ(renderer.meshes, 0u);

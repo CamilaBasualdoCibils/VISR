@@ -8,7 +8,7 @@ namespace {
 const LNode &OnlySurface(const ParseResult<Document> &parsed) {
   return parsed.value.surfaces.at(0);
 }
-}
+} // namespace
 
 TEST(Parser, ParsesMinimalDocumentAndPreservesText) {
   const auto parsed = ParseARUI(R"(<arui>
@@ -21,7 +21,8 @@ TEST(Parser, ParsesMinimalDocumentAndPreservesText) {
   EXPECT_EQ(surface.style.height, (Length{10, LengthUnit::Centimeter}));
   ASSERT_EQ(surface.children.size(), 1u);
   EXPECT_EQ(surface.children[0].type, LNodeType::Text);
-  EXPECT_EQ(*surface.children[0].GetAttribute<std::string>("text"), "Hello, ARUI!");
+  EXPECT_EQ(*surface.children[0].GetAttribute<std::string>("text"),
+            "Hello, ARUI!");
   EXPECT_TRUE(surface.children[0].children.empty());
 }
 
@@ -59,10 +60,12 @@ TEST(Parser, ExtractsStylesScriptsAndBehavior) {
   </arui>)");
   ASSERT_TRUE(parsed);
   ASSERT_EQ(parsed.value.stylesheets.size(), 1u);
-  EXPECT_NE(parsed.value.stylesheets[0].find("padding: 5mm"), std::string::npos);
+  EXPECT_NE(parsed.value.stylesheets[0].find("padding: 5mm"),
+            std::string::npos);
   ASSERT_EQ(parsed.value.scripts.size(), 1u);
   EXPECT_EQ(parsed.value.scripts[0].type, "module");
-  EXPECT_NE(parsed.value.scripts[0].source.find("function play"), std::string::npos);
+  EXPECT_NE(parsed.value.scripts[0].source.find("function play"),
+            std::string::npos);
   const auto &panel = OnlySurface(parsed).children.at(0);
   EXPECT_EQ(*panel.GetAttribute<std::string>("behavior"), "play");
 }
@@ -73,17 +76,19 @@ TEST(Parser, ParsesStateAsTypedReferenceAndImageNode) {
   </surface></arui>)");
   ASSERT_TRUE(parsed);
   const auto &children = OnlySurface(parsed).children;
-  EXPECT_EQ(children[0].GetAttribute<StateReference>("state")->value, "system.cpu");
+  EXPECT_EQ(children[0].GetAttribute<StateReference>("state")->value,
+            "system.cpu");
   EXPECT_EQ(children[1].type, LNodeType::Image);
 }
 
 class InvalidLength : public testing::TestWithParam<const char *> {};
 TEST_P(InvalidLength, RejectsUnsupportedUnit) {
   const auto parsed = ParseMarkup(std::string("<arui><surface width=\"1") +
-      GetParam() + "\" height=\"1m\"/></arui>");
+                                  GetParam() + "\" height=\"1m\"/></arui>");
   EXPECT_FALSE(parsed);
   ASSERT_FALSE(parsed.diagnostics.empty());
-  EXPECT_NE(parsed.diagnostics[0].message.find("unsupported"), std::string::npos);
+  EXPECT_NE(parsed.diagnostics[0].message.find("unsupported"),
+            std::string::npos);
 }
 INSTANTIATE_TEST_SUITE_P(UnsupportedUnits, InvalidLength,
                          testing::Values("px", "em", "rem"));
@@ -91,15 +96,18 @@ INSTANTIATE_TEST_SUITE_P(UnsupportedUnits, InvalidLength,
 TEST(Parser, RejectsMissingSurfaceWidthAndHeight) {
   auto missingWidth = ParseMarkup("<arui><surface height=\"1m\"/></arui>");
   EXPECT_FALSE(missingWidth);
-  EXPECT_NE(missingWidth.diagnostics[0].message.find("width"), std::string::npos);
+  EXPECT_NE(missingWidth.diagnostics[0].message.find("width"),
+            std::string::npos);
   auto missingHeight = ParseMarkup("<arui><surface width=\"1m\"/></arui>");
   EXPECT_FALSE(missingHeight);
-  EXPECT_NE(missingHeight.diagnostics[0].message.find("height"), std::string::npos);
+  EXPECT_NE(missingHeight.diagnostics[0].message.find("height"),
+            std::string::npos);
 }
 
 TEST(Parser, RejectsInvalidRootUnknownNodesAndTopLevelElements) {
   EXPECT_FALSE(ParseMarkup("<surface width=\"1m\" height=\"1m\"/>"));
-  auto unknown = ParseMarkup("<arui><surface width=\"1m\" height=\"1m\"><slider/></surface></arui>");
+  auto unknown = ParseMarkup(
+      "<arui><surface width=\"1m\" height=\"1m\"><slider/></surface></arui>");
   EXPECT_FALSE(unknown);
   EXPECT_NE(unknown.diagnostics[0].message.find("slider"), std::string::npos);
   auto top = ParseMarkup("<arui><metadata/></arui>");
@@ -108,15 +116,18 @@ TEST(Parser, RejectsInvalidRootUnknownNodesAndTopLevelElements) {
 }
 
 TEST(Parser, RejectsInvalidAttributesExternalScriptsAndMalformedXml) {
-  auto attribute = ParseMarkup("<arui><surface width=\"1m\" height=\"1m\"><row bogus=\"x\"/></surface></arui>");
+  auto attribute = ParseMarkup("<arui><surface width=\"1m\" height=\"1m\"><row "
+                               "bogus=\"x\"/></surface></arui>");
   EXPECT_FALSE(attribute);
   EXPECT_NE(attribute.diagnostics[0].message.find("bogus"), std::string::npos);
   auto external = ParseMarkup("<arui><script src=\"./test.js\"/></arui>");
   EXPECT_FALSE(external);
-  EXPECT_NE(external.diagnostics[0].message.find("./test.js"), std::string::npos);
+  EXPECT_NE(external.diagnostics[0].message.find("./test.js"),
+            std::string::npos);
   auto malformed = ParseMarkup("<arui><surface></arui>");
   EXPECT_FALSE(malformed);
-  EXPECT_NE(malformed.diagnostics[0].message.find("XML syntax error"), std::string::npos);
+  EXPECT_NE(malformed.diagnostics[0].message.find("XML syntax error"),
+            std::string::npos);
   EXPECT_GT(malformed.diagnostics[0].column, 0u);
 }
 
@@ -127,7 +138,9 @@ TEST(Parser, MarkupRoundTripsAsAruiDocument) {
   const auto reparsed = ParseMarkup(SerializeMarkup(parsed.value));
   ASSERT_TRUE(reparsed) << reparsed.diagnostics[0].message;
   ASSERT_EQ(reparsed.value.surfaces.size(), 1u);
-  EXPECT_EQ(*reparsed.value.surfaces[0].children[0].GetAttribute<std::string>("text"), "Hello");
+  EXPECT_EQ(
+      *reparsed.value.surfaces[0].children[0].GetAttribute<std::string>("text"),
+      "Hello");
 }
 
 TEST(Parser, StyleSheetRoundTripsUnchanged) {
@@ -136,4 +149,27 @@ TEST(Parser, StyleSheetRoundTripsUnchanged) {
   const auto reparsed = ParseStyles(SerializeStyles(parsed.value));
   ASSERT_TRUE(reparsed);
   EXPECT_EQ(reparsed.value, parsed.value);
+}
+
+TEST(Parser, ResolvesClassFillToTypedColor) {
+  const auto parsed = ParseARUI(R"(<arui>
+    <style>.red { fill: #ff000080; }</style>
+    <surface width="20cm" height="10cm"><panel class="red"/></surface>
+  </arui>)");
+  ASSERT_TRUE(parsed) << parsed.diagnostics.front().message;
+  const auto &properties =
+      OnlySurface(parsed).children.at(0).style.painterProperties;
+  const auto *color = std::get_if<Color>(&properties.at("fill"));
+  ASSERT_NE(color, nullptr);
+  EXPECT_FLOAT_EQ(color->rgba.r, 1.0F);
+  EXPECT_FLOAT_EQ(color->rgba.g, 0.0F);
+  EXPECT_FLOAT_EQ(color->rgba.b, 0.0F);
+  EXPECT_FLOAT_EQ(color->rgba.a, 128.0F / 255.0F);
+}
+
+TEST(Parser, RejectsNamedAndMalformedFillColors) {
+  EXPECT_FALSE(ParseARUI(R"(<arui><style>.bad { fill: red; }</style>
+    <surface width="1m" height="1m"><panel class="bad"/></surface></arui>)"));
+  EXPECT_FALSE(ParseARUI(R"(<arui><style>.bad { fill: #1234; }</style>
+    <surface width="1m" height="1m"><panel class="bad"/></surface></arui>)"));
 }

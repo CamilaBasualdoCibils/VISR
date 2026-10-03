@@ -1,19 +1,19 @@
-#include "ARUI/Render/Backends/OpenGL/OpenGLOpenXRBinding.hpp"
 #include "ARUI/Tools/Simulator/SimulatorApplication.hpp"
+#include "ARUI/Render/Backends/OpenGL/OpenGLOpenXRBinding.hpp"
 
 #include "ARUI/Render/RenderGraph.hpp"
 #include "ARUI/Render/Renderer.hpp"
-#include "ARUI/Render/RuntimePainter.hpp"
 #include "ARUI/Render/StandardPipeline.hpp"
+#include "ARUI/Runtime/RuntimePainter.hpp"
 
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <span>
-#include <thread>
-#include <string>
-#include <vector>
 #include <glm/geometric.hpp>
+#include <span>
+#include <string>
+#include <thread>
+#include <vector>
 
 namespace ARUI::Tools::Simulator {
 namespace {
@@ -45,8 +45,8 @@ float InsetMeters(const std::optional<Language::Length> &length,
                   float containingWidth) {
   if (!length || length->IsAuto())
     return 0.0F;
-  const float reference = length->unit == Language::LengthUnit::Percent
-                              ? containingWidth : 0.0F;
+  const float reference =
+      length->unit == Language::LengthUnit::Percent ? containingWidth : 0.0F;
   return std::max(0.0F, Meters(length, reference));
 }
 
@@ -79,30 +79,27 @@ Render::MeshRenderObject MakeQuad(const RenderView &view, glm::vec3 center,
     glm::vec4 equation;
     float minimum;
   };
-  const std::array clipPlanes = {
-      ClipPlane{{0.0F, 0.0F, 0.0F, 1.0F}, 1.0e-5F},
-      ClipPlane{{0.0F, 0.0F, 1.0F, 1.0F}, 0.0F},
-      ClipPlane{{0.0F, 0.0F, -1.0F, 1.0F}, 0.0F},
-      ClipPlane{{1.0F, 0.0F, 0.0F, 1.0F}, 0.0F},
-      ClipPlane{{-1.0F, 0.0F, 0.0F, 1.0F}, 0.0F},
-      ClipPlane{{0.0F, 1.0F, 0.0F, 1.0F}, 0.0F},
-      ClipPlane{{0.0F, -1.0F, 0.0F, 1.0F}, 0.0F}};
+  const std::array clipPlanes = {ClipPlane{{0.0F, 0.0F, 0.0F, 1.0F}, 1.0e-5F},
+                                 ClipPlane{{0.0F, 0.0F, 1.0F, 1.0F}, 0.0F},
+                                 ClipPlane{{0.0F, 0.0F, -1.0F, 1.0F}, 0.0F},
+                                 ClipPlane{{1.0F, 0.0F, 0.0F, 1.0F}, 0.0F},
+                                 ClipPlane{{-1.0F, 0.0F, 0.0F, 1.0F}, 0.0F},
+                                 ClipPlane{{0.0F, 1.0F, 0.0F, 1.0F}, 0.0F},
+                                 ClipPlane{{0.0F, -1.0F, 0.0F, 1.0F}, 0.0F}};
   for (const ClipPlane &plane : clipPlanes) {
     if (polygon.empty())
       break;
     std::vector<glm::vec4> clipped;
     clipped.reserve(polygon.size() + 1);
     glm::vec4 previous = polygon.back();
-    float previousDistance =
-        glm::dot(plane.equation, previous) - plane.minimum;
+    float previousDistance = glm::dot(plane.equation, previous) - plane.minimum;
     for (const glm::vec4 &current : polygon) {
       const float currentDistance =
           glm::dot(plane.equation, current) - plane.minimum;
       const bool previousInside = previousDistance >= 0.0F;
       const bool currentInside = currentDistance >= 0.0F;
       if (previousInside != currentInside) {
-        const float t =
-            previousDistance / (previousDistance - currentDistance);
+        const float t = previousDistance / (previousDistance - currentDistance);
         clipped.push_back(previous + t * (current - previous));
       }
       if (currentInside)
@@ -130,23 +127,39 @@ Render::MeshRenderObject MakeQuad(const RenderView &view, glm::vec3 center,
 void SubmitTrackedHands(Render::Renderer &renderer, const RenderView &view,
                         SimulatorXRTracker &tracker) {
   static constexpr std::array<std::string_view, 26> joints = {
-      "palm", "wrist", "thumb_metacarpal", "thumb_proximal", "thumb_distal",
-      "thumb_tip", "index_metacarpal", "index_proximal",
-      "index_intermediate", "index_distal", "index_tip", "middle_metacarpal",
-      "middle_proximal", "middle_intermediate", "middle_distal", "middle_tip",
-      "ring_metacarpal", "ring_proximal", "ring_intermediate", "ring_distal",
-      "ring_tip", "little_metacarpal", "little_proximal",
-      "little_intermediate", "little_distal", "little_tip"};
-  static constexpr std::array<std::pair<size_t, size_t>, 25> bones = {{
-      {1, 0}, {0, 2}, {2, 3}, {3, 4}, {4, 5},
-      {0, 6}, {6, 7}, {7, 8}, {8, 9}, {9, 10},
-      {0, 11}, {11, 12}, {12, 13}, {13, 14}, {14, 15},
-      {0, 16}, {16, 17}, {17, 18}, {18, 19}, {19, 20},
-      {0, 21}, {21, 22}, {22, 23}, {23, 24}, {24, 25}}};
-  const glm::vec3 cameraRight = glm::vec3{
-      glm::inverse(view.view)[0]};
-  const glm::vec3 cameraUp = glm::vec3{
-      glm::inverse(view.view)[1]};
+      "palm",
+      "wrist",
+      "thumb_metacarpal",
+      "thumb_proximal",
+      "thumb_distal",
+      "thumb_tip",
+      "index_metacarpal",
+      "index_proximal",
+      "index_intermediate",
+      "index_distal",
+      "index_tip",
+      "middle_metacarpal",
+      "middle_proximal",
+      "middle_intermediate",
+      "middle_distal",
+      "middle_tip",
+      "ring_metacarpal",
+      "ring_proximal",
+      "ring_intermediate",
+      "ring_distal",
+      "ring_tip",
+      "little_metacarpal",
+      "little_proximal",
+      "little_intermediate",
+      "little_distal",
+      "little_tip"};
+  static constexpr std::array<std::pair<size_t, size_t>, 25> bones = {
+      {{1, 0},   {0, 2},   {2, 3},   {3, 4},   {4, 5},   {0, 6},   {6, 7},
+       {7, 8},   {8, 9},   {9, 10},  {0, 11},  {11, 12}, {12, 13}, {13, 14},
+       {14, 15}, {0, 16},  {16, 17}, {17, 18}, {18, 19}, {19, 20}, {0, 21},
+       {21, 22}, {22, 23}, {23, 24}, {24, 25}}};
+  const glm::vec3 cameraRight = glm::vec3{glm::inverse(view.view)[0]};
+  const glm::vec3 cameraUp = glm::vec3{glm::inverse(view.view)[1]};
   for (size_t hand = 0; hand < 2; ++hand) {
     if (!tracker.IsHandTracked(hand))
       continue;
@@ -155,8 +168,8 @@ void SubmitTrackedHands(Render::Renderer &renderer, const RenderView &view,
     for (size_t joint = 0; joint < joints.size(); ++joint)
       poses[joint] = tracker.GetPose(prefix + std::string(joints[joint]));
     for (const auto &[start, end] : bones) {
-      if (!poses[start] || !poses[end] ||
-          !poses[start]->positionValid || !poses[end]->positionValid)
+      if (!poses[start] || !poses[end] || !poses[start]->positionValid ||
+          !poses[end]->positionValid)
         continue;
       const glm::vec3 from = poses[start]->pose.position;
       const glm::vec3 to = poses[end]->pose.position;
@@ -168,14 +181,14 @@ void SubmitTrackedHands(Render::Renderer &renderer, const RenderView &view,
       if (glm::length(side) < 0.1F)
         side = glm::cross(glm::normalize(axis), cameraUp);
       side = glm::normalize(side);
-      renderer.Submit(MakeQuad(view, (from + to) * 0.5F,
-                               glm::normalize(axis), side, length, 0.008F));
+      renderer.Submit(MakeQuad(view, (from + to) * 0.5F, glm::normalize(axis),
+                               side, length, 0.008F));
     }
     for (const auto &joint : poses) {
       if (!joint || !joint->positionValid)
         continue;
-      renderer.Submit(MakeQuad(view, joint->pose.position,
-                               cameraRight, cameraUp, 0.014F, 0.014F));
+      renderer.Submit(MakeQuad(view, joint->pose.position, cameraRight,
+                               cameraUp, 0.014F, 0.014F));
     }
   }
 }
@@ -196,17 +209,16 @@ void SubmitTrackedBody(Render::Renderer &renderer, const RenderView &view,
     if (!pose || !pose->positionValid)
       continue;
     // The hand tracker already draws fingers at a finer resolution.
-    if (joint < 18 || joint >= 70 ||
-        !tracker.IsHandTracked(joint < 44 ? 0 : 1))
-      renderer.Submit(MakeQuad(view, pose->pose.position,
-                               cameraRight, cameraUp, 0.022F, 0.022F));
+    if (joint < 18 || joint >= 70 || !tracker.IsHandTracked(joint < 44 ? 0 : 1))
+      renderer.Submit(MakeQuad(view, pose->pose.position, cameraRight, cameraUp,
+                               0.022F, 0.022F));
     const int32_t parent = tracker.GetBodyJointParent(joint);
-    if (parent < 0 || static_cast<size_t>(parent) >= count ||
-        !poses[parent] || !poses[parent]->positionValid)
+    if (parent < 0 || static_cast<size_t>(parent) >= count || !poses[parent] ||
+        !poses[parent]->positionValid)
       continue;
-    // Avoid drawing the same fingers twice when separate hand tracking is active.
-    if (joint >= 18 && joint < 70 &&
-        tracker.IsHandTracked(joint < 44 ? 0 : 1))
+    // Avoid drawing the same fingers twice when separate hand tracking is
+    // active.
+    if (joint >= 18 && joint < 70 && tracker.IsHandTracked(joint < 44 ? 0 : 1))
       continue;
     const glm::vec3 from = poses[parent]->pose.position;
     const glm::vec3 to = pose->pose.position;
@@ -218,31 +230,36 @@ void SubmitTrackedBody(Render::Renderer &renderer, const RenderView &view,
     if (glm::length(side) < 0.1F)
       side = glm::cross(glm::normalize(axis), cameraUp);
     side = glm::normalize(side);
-    renderer.Submit(MakeQuad(view, (from + to) * 0.5F,
-                             glm::normalize(axis), side, length, 0.012F));
+    renderer.Submit(MakeQuad(view, (from + to) * 0.5F, glm::normalize(axis),
+                             side, length, 0.012F));
   }
 }
 
-Render::SurfacePaintView MakeSurfaceView(
-    const Runtime::RNode &surface, const RenderView &view,
-    SimulatorXRTracker &tracker, glm::uvec2 extent) {
+Runtime::SurfacePaintView MakeSurfaceView(const Runtime::RNode &surface,
+                                          const RenderView &view,
+                                          SimulatorXRTracker &tracker,
+                                          glm::uvec2 extent) {
   const float x = Meters(surface.style.xOffset, 0.0F);
   const float y = Meters(surface.style.yOffset, 0.0F);
   const float z = Meters(surface.style.zOffset, -2.0F);
   const auto anchorAttribute = surface.attributes.find("anchor");
-  const auto *anchorName = anchorAttribute == surface.attributes.end()
-      ? nullptr : std::get_if<std::string>(&anchorAttribute->second);
+  const auto *anchorName =
+      anchorAttribute == surface.attributes.end()
+          ? nullptr
+          : std::get_if<std::string>(&anchorAttribute->second);
   Pose anchor;
   if (anchorName && *anchorName != "world")
-    if (const auto tracked = tracker.GetPose(*anchorName)) anchor = tracked->pose;
+    if (const auto tracked = tracker.GetPose(*anchorName))
+      anchor = tracked->pose;
   const glm::vec3 center =
       anchor.position + anchor.orientation * glm::vec3{x, y, z};
-  const glm::quat orientation = glm::normalize(
-      anchor.orientation * glm::quat(glm::vec3{
-          Radians(surface.style.xRotation), Radians(surface.style.yRotation),
-          Radians(surface.style.zRotation)}));
-  const glm::mat4 model = glm::translate(glm::mat4{1.0F}, center) *
-                          glm::mat4_cast(orientation);
+  const glm::quat orientation =
+      glm::normalize(anchor.orientation *
+                     glm::quat(glm::vec3{Radians(surface.style.xRotation),
+                                         Radians(surface.style.yRotation),
+                                         Radians(surface.style.zRotation)}));
+  const glm::mat4 model =
+      glm::translate(glm::mat4{1.0F}, center) * glm::mat4_cast(orientation);
   const glm::mat4 localToClip = view.projection * view.view * model;
 
   const auto project = [&](glm::vec3 local) {
@@ -250,9 +267,10 @@ Render::SurfacePaintView MakeSurfaceView(
     return glm::vec2{clip} / clip.w;
   };
   constexpr float sampleMeters = 0.01F;
-  const float pixelsPerMeter = std::max(1.0F,
-      glm::length(project({0.0F, sampleMeters, 0.0F}) - project({0.0F, 0.0F, 0.0F})) *
-      static_cast<float>(extent.y) * 0.5F / sampleMeters);
+  const float pixelsPerMeter =
+      std::max(1.0F, glm::length(project({0.0F, sampleMeters, 0.0F}) -
+                                 project({0.0F, 0.0F, 0.0F})) *
+                         static_cast<float>(extent.y) * 0.5F / sampleMeters);
   return {.localToClip = localToClip, .pixelsPerMeter = pixelsPerMeter};
 }
 
@@ -288,8 +306,8 @@ int SimulatorApplication::Run() {
   }
 
   Render::StandardPipeline standardPipeline{*renderDevice_};
-  Render::PainterRegistry painters;
-  Render::RegisterDefaultPainter(painters);
+  Runtime::PainterRegistry painters;
+  Runtime::RegisterFlatPainter(painters);
   using Clock = std::chrono::steady_clock;
   const auto framePeriod = std::chrono::duration_cast<Clock::duration>(
       std::chrono::duration<double>{1.0 / 90.0});
@@ -313,24 +331,26 @@ int SimulatorApplication::Run() {
     const auto frameViews = views_->GetViews();
     for (std::size_t i = 0; i < frameViews.size(); ++i) {
       Render::Renderer renderer(
-          *renderDevice_, standardPipeline.Configuration({.colorAttachment = imageViews[i],
-                                          .clearColor = true,
-                                          .clearColorValue =
-                                              i != 0 && tracker_->IsPassthroughEnabled()
-                                                  ? glm::vec4{0.0F}
-                                                  : glm::vec4{0.08F, 0.09F, 0.12F, 1.0F},
-                                          .extent = imageExtents[i],
-                                          .offset = {0, 0}}));
+          *renderDevice_,
+          standardPipeline.Configuration(
+              {.colorAttachment = imageViews[i],
+               .clearColor = true,
+               .clearColorValue = i != 0 && tracker_->IsPassthroughEnabled()
+                                      ? glm::vec4{0.0F}
+                                      : glm::vec4{0.08F, 0.09F, 0.12F, 1.0F},
+               .extent = imageExtents[i],
+               .offset = {0, 0}}));
       Render::RenderGraph graph;
       renderer.BeginFrame();
-      Render::PaintContext paintContext{renderer};
+      Runtime::PaintContext paintContext{renderer};
       for (const Runtime::NodeID root : runtimeTree_.RootChildren()) {
         const auto *surface = runtimeTree_.Get(root);
         if (!surface || surface->surfaceType != Language::SurfaceType::Plane)
           continue;
-        Render::PaintRuntimeSurface(
-            paintContext, painters, runtimeTree_, root,
-            MakeSurfaceView(*surface, frameViews[i], *tracker_, imageExtents[i]));
+        Runtime::PaintRuntimeSurface(paintContext, painters, runtimeTree_, root,
+                                     MakeSurfaceView(*surface, frameViews[i],
+                                                     *tracker_,
+                                                     imageExtents[i]));
       }
       if (tracker_->DrawSkeletons()) {
         SubmitTrackedHands(renderer, frameViews[i], *tracker_);

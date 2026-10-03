@@ -13,7 +13,6 @@
 
 namespace ARUI::Language {
 
-
 struct LayoutParameters {
   Length margin{0.0, LengthUnit::Millimeter};
   Length padding{0.0, LengthUnit::Millimeter};
@@ -70,14 +69,14 @@ struct Style {
   std::optional<Length> fontSize;
 
   // Surface-local translation, resolved before the surface is painted.
-  std::optional<Length> xOffset;
-  std::optional<Length> yOffset;
-  std::optional<Length> zOffset;
+  std::optional<Length> xOffset = Length{0, LengthUnit::Centimeter};
+  std::optional<Length> yOffset = Length{0, LengthUnit::Millimeter};
+  std::optional<Length> zOffset = Length{0, LengthUnit::Millimeter};
 
   // Local Euler rotation of a surface, applied after its anchor orientation.
-  std::optional<Angle> xRotation;
-  std::optional<Angle> yRotation;
-  std::optional<Angle> zRotation;
+  std::optional<Angle> xRotation = Angle{0, AngleUnit::Degree};
+  std::optional<Angle> yRotation = Angle{0, AngleUnit::Degree};
+  std::optional<Angle> zRotation = Angle{0, AngleUnit::Degree};
 
   std::optional<std::string> shape;
   std::optional<Length> radius;

@@ -1,9 +1,7 @@
 add_library(ARUIRender STATIC
     src/Font.cpp
-    src/Painter.cpp
     src/Renderer.cpp
     src/RenderGraph.cpp
-    src/RuntimePainter.cpp
     src/StandardPipeline.cpp)
 add_library(ARUI::Render ALIAS ARUIRender)
 target_include_directories(ARUIRender PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)

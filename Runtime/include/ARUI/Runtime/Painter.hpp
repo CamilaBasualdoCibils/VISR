@@ -1,7 +1,7 @@
 #pragma once
 #include "ARUI/Language/Style.hpp"
 #include "ARUI/Language/node.hpp"
-#include "ARUI/Render/IRenderer.hpp"
+#include "ARUI/Runtime/DrawingObjects.hpp"
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/vector_float2.hpp>
 #include <memory>
@@ -9,7 +9,8 @@
 #include <string_view>
 #include <unordered_map>
 
-namespace ARUI::Render {
+namespace ARUI::Runtime {
+inline constexpr std::string_view DefaultPainterName{"arui-flat-painter"};
 // Immutable output of layout. Painters do not compute bounds or placement.
 struct PaintNode {
   Language::LNodeType type{};
@@ -26,7 +27,7 @@ using ComputedPainterStyle = Language::PainterStyleProperties;
 
 class PaintContext {
 public:
-  explicit PaintContext(IRenderer &renderer) : renderer_(renderer) {}
+  explicit PaintContext(DrawingObjectSink &renderer) : renderer_(renderer) {}
   void FillPath(const FillPathRenderObject &v) { renderer_.FillPath(v); }
   void StrokePath(const StrokePathRenderObject &v) { renderer_.StrokePath(v); }
   void DrawSurface(const SurfaceRenderObject &v) { renderer_.Submit(v); }
@@ -34,8 +35,9 @@ public:
   void DrawCurve(const CurveRenderObject &v) { renderer_.Submit(v); }
   void DrawText(const TextRenderObject &v) { renderer_.Submit(v); }
   void DrawMesh(const MeshRenderObject &v) { renderer_.Submit(v); }
+
 private:
-  IRenderer &renderer_;
+  DrawingObjectSink &renderer_;
 };
 
 class IPainter {
@@ -51,16 +53,21 @@ class PainterRegistry {
 public:
   void Register(std::string name, std::shared_ptr<const IPainter> painter);
   [[nodiscard]] const IPainter *Find(std::string_view name) const noexcept;
+  [[nodiscard]] const IPainter *Default() const noexcept {
+    return Find(DefaultPainterName);
+  }
+
 private:
   std::unordered_map<std::string, std::shared_ptr<const IPainter>> painters_;
 };
 
-class DefaultPainter final : public IPainter {
+class FlatPainter final : public IPainter {
 public:
   [[nodiscard]] const Language::PainterStyleSchema &
   StyleSchema() const noexcept override;
   void Paint(const PaintNode &, const ComputedPainterStyle &,
              PaintContext &) const override;
+
 private:
   Language::PainterStyleSchema schema_{{
       {"fill", Language::PainterStyleType::Color, false, true},
@@ -71,7 +78,7 @@ private:
   }};
 };
 
-using DefaultPanelPainter = DefaultPainter;
+using DefaultPanelPainter = FlatPainter;
 
-void RegisterDefaultPainter(PainterRegistry &registry);
-} // namespace ARUI::Render
+void RegisterFlatPainter(PainterRegistry &registry);
+} // namespace ARUI::Runtime

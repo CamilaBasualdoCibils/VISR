@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ARUI/Language/Diagnostic.hpp"
 #include "ARUI/Language/node.hpp"
 #include "ARUI/Render/Backends/OpenGL/OpenGLCommons.hpp"
 #include "ARUI/Render/Backends/OpenGL/OpenGLRenderDevice.hpp"
@@ -12,6 +13,7 @@
 #include <optional>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <string>
 
 namespace ARUI::Tools::Simulator {
 
@@ -39,6 +41,8 @@ private:
   void DrawEditorShell();
   void DrawTrackingInspector();
   void DrawDocumentEditor();
+  void ApplyMarkupEditor();
+  void RefreshMarkupFromVisualEditor();
   bool DrawLanguageNodeEditor(Language::LNode &node, bool root);
   void DrawScenePanel();
   void DrawViewport();
@@ -61,6 +65,9 @@ private:
   uint64_t runtimeRevision_{};
   bool autoSubmit_{true};
   bool documentChangedThisFrame_{};
+  std::string markupSource_;
+  std::vector<Language::Diagnostic> markupDiagnostics_;
+  bool markupOutOfSync_{};
   std::shared_ptr<SimulatorXRTracker> tracker_;
   std::shared_ptr<SimulatorViewProvider> views_;
   std::shared_ptr<Render::OpenGLRenderDevice> renderDevice_;

@@ -1,12 +1,13 @@
 #pragma once
 
-#include "ARUI/Render/RenderObjects.hpp"
+#include "ARUI/Runtime/DrawingObjects.hpp"
 
 namespace ARUI::Render {
+using namespace Runtime;
 
 class RenderGraph;
 
-class IRenderer {
+class IRenderer : public Runtime::DrawingObjectSink {
 public:
   virtual ~IRenderer() = default;
 

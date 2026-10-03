@@ -1,10 +1,13 @@
 #include "ARUI/Tools/Simulator/SimulatorPresenter.hpp"
+#include "ARUI/Language/Parser.hpp"
+#include "ARUI/Language/Serializer.hpp"
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_internal.h>
+#include <imgui_stdlib.h>
 #include <implot.h>
 #include <spdlog/spdlog.h>
 #include <stdexcept>
@@ -23,8 +26,7 @@ ARUI::Language::LNode MakeDefaultDocument() {
   panelStyle.padding = Language::Length{0.06, Language::LengthUnit::Meter};
 
   return Language::LSurface(
-      {Language::LPanel({Language::LText("Hello world")}, {},
-                        panelStyle)},
+      {Language::LPanel({Language::LText("Hello world")}, {}, panelStyle)},
       {.anchor = "head"}, surfaceStyle);
 }
 
@@ -46,6 +48,7 @@ SimulatorPresenter::SimulatorPresenter(
     std::shared_ptr<SimulatorViewProvider> views)
     : tracker_(std::move(tracker)), views_(std::move(views)),
       draftDocuments_{MakeDefaultDocument()} {
+  RefreshMarkupFromVisualEditor();
   submittedDocuments_ = draftDocuments_;
   glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
   glfwSetErrorCallback(GLFWErrorCallback);
@@ -263,17 +266,15 @@ void SimulatorPresenter::DrawTrackingInspector() {
       const bool active = tracker_->IsBodyTracked();
       ImGui::Text("%s - %zu joints, confidence %.2f",
                   active ? "Tracking" : "Inactive",
-                  tracker_->GetBodyJointCount(),
-                  tracker_->GetBodyConfidence());
+                  tracker_->GetBodyJointCount(), tracker_->GetBodyConfidence());
       if (ImGui::TreeNode("Body joints")) {
         for (size_t joint = 0; joint < tracker_->GetBodyJointCount(); ++joint) {
           const auto pose = tracker_->GetBodyJointPose(joint);
           if (!pose || !pose->positionValid)
             continue;
           const auto name = tracker_->GetBodyJointName(joint);
-          ImGui::Text("%.*s: %.3f, %.3f, %.3f m",
-                      static_cast<int>(name.size()), name.data(),
-                      pose->pose.position.x, pose->pose.position.y,
+          ImGui::Text("%.*s: %.3f, %.3f, %.3f m", static_cast<int>(name.size()),
+                      name.data(), pose->pose.position.x, pose->pose.position.y,
                       pose->pose.position.z);
         }
         ImGui::TreePop();
@@ -359,7 +360,8 @@ bool SimulatorPresenter::DrawLanguageNodeEditor(Language::LNode &node,
         if (surfaceTypes[surfaceTypeIndex] == node.surfaceType)
           break;
       ImGui::SetNextItemWidth(-1.0F);
-      if (ImGui::BeginCombo("Surface Type", surfaceTypeNames[surfaceTypeIndex])) {
+      if (ImGui::BeginCombo("Surface Type",
+                            surfaceTypeNames[surfaceTypeIndex])) {
         for (std::size_t i = 0; i < surfaceTypes.size(); ++i) {
           const bool selected = node.surfaceType == surfaceTypes[i];
           if (ImGui::Selectable(surfaceTypeNames[i], selected) && !selected) {
@@ -423,7 +425,7 @@ bool SimulatorPresenter::DrawLanguageNodeEditor(Language::LNode &node,
       return "Auto";
     };
     auto drawLengthValue = [this, &unitLabel](Language::Length &value,
-                                               bool allowNegative) {
+                                              bool allowNegative) {
       ImGui::SetNextItemWidth(76.0F);
       if (ImGui::BeginCombo("##Unit", unitLabel(value.unit))) {
         for (const UnitChoice &choice : unitChoices) {
@@ -451,8 +453,8 @@ bool SimulatorPresenter::DrawLanguageNodeEditor(Language::LNode &node,
       ImGui::BeginDisabled(value.IsAuto());
       ImGui::SetNextItemWidth(-1.0F);
       const float minimum = allowNegative ? -10000.0F : 0.0F;
-      if (ImGui::DragFloat("##Value", &numericValue, 0.01F, minimum,
-                           10000.0F, "%.2f")) {
+      if (ImGui::DragFloat("##Value", &numericValue, 0.01F, minimum, 10000.0F,
+                           "%.2f")) {
         value.value = value.unit == Language::LengthUnit::Percent
                           ? numericValue * 100.0
                           : numericValue;
@@ -460,9 +462,9 @@ bool SimulatorPresenter::DrawLanguageNodeEditor(Language::LNode &node,
       }
       ImGui::EndDisabled();
     };
-    auto editLength = [this, &beginStyleRow, &drawLengthValue, &unitLabel](
-                          const char *label,
-                          std::optional<Language::Length> &value) {
+    auto editLength = [this, &beginStyleRow, &drawLengthValue,
+                       &unitLabel](const char *label,
+                                   std::optional<Language::Length> &value) {
       beginStyleRow(label);
       const char *preview = value ? unitLabel(value->unit) : "Unset";
       ImGui::SetNextItemWidth(76.0F);
@@ -475,11 +477,10 @@ bool SimulatorPresenter::DrawLanguageNodeEditor(Language::LNode &node,
         for (const UnitChoice &choice : unitChoices) {
           const bool selected = value && value->unit == choice.unit;
           if (ImGui::Selectable(choice.label, selected) && !selected) {
-            const double initial = choice.unit == Language::LengthUnit::Auto
-                                       ? 0.0
-                                   : choice.unit == Language::LengthUnit::Percent
-                                       ? 100.0
-                                       : 1.0;
+            const double initial =
+                choice.unit == Language::LengthUnit::Auto      ? 0.0
+                : choice.unit == Language::LengthUnit::Percent ? 100.0
+                                                               : 1.0;
             value = Language::Length{initial, choice.unit};
             documentChangedThisFrame_ = true;
           }
@@ -507,29 +508,29 @@ bool SimulatorPresenter::DrawLanguageNodeEditor(Language::LNode &node,
       }
       ImGui::PopID();
     };
-    auto editSize = [&beginStyleRow, &drawLengthValue](
-                        const char *label, Language::Length &size) {
+    auto editSize = [&beginStyleRow, &drawLengthValue](const char *label,
+                                                       Language::Length &size) {
       beginStyleRow(label);
       drawLengthValue(size, false);
       ImGui::PopID();
     };
-    auto editRotation = [this, &beginStyleRow](
-                            const char *label,
-                            std::optional<Language::Angle> &angle) {
-      beginStyleRow(label);
-      float degrees = angle
-                          ? (angle->unit == Language::AngleUnit::Degree
-                                 ? static_cast<float>(angle->value)
-                                 : glm::degrees(static_cast<float>(angle->value)))
-                          : 0.0F;
-      ImGui::SetNextItemWidth(-1.0F);
-      if (ImGui::DragFloat("##Value", &degrees, 0.25F, -180.0F, 180.0F,
-                           "%.1f deg")) {
-        angle = Language::Angle{degrees, Language::AngleUnit::Degree};
-        documentChangedThisFrame_ = true;
-      }
-      ImGui::PopID();
-    };
+    auto editRotation =
+        [this, &beginStyleRow](const char *label,
+                               std::optional<Language::Angle> &angle) {
+          beginStyleRow(label);
+          float degrees =
+              angle ? (angle->unit == Language::AngleUnit::Degree
+                           ? static_cast<float>(angle->value)
+                           : glm::degrees(static_cast<float>(angle->value)))
+                    : 0.0F;
+          ImGui::SetNextItemWidth(-1.0F);
+          if (ImGui::DragFloat("##Value", &degrees, 0.25F, -180.0F, 180.0F,
+                               "%.1f deg")) {
+            angle = Language::Angle{degrees, Language::AngleUnit::Degree};
+            documentChangedThisFrame_ = true;
+          }
+          ImGui::PopID();
+        };
 
     ImGui::SeparatorText("Style");
     if (ImGui::BeginTable("StyleFields", 2,
@@ -585,37 +586,97 @@ bool SimulatorPresenter::DrawLanguageNodeEditor(Language::LNode &node,
   return remove;
 }
 
+void SimulatorPresenter::RefreshMarkupFromVisualEditor() {
+  Language::Document document;
+  document.surfaces = draftDocuments_;
+  markupSource_ = Language::SerializeMarkup(document);
+  markupOutOfSync_ = false;
+  markupDiagnostics_.clear();
+}
+
+void SimulatorPresenter::ApplyMarkupEditor() {
+  auto parsed = Language::ParseARUI(markupSource_);
+  markupDiagnostics_ = parsed.diagnostics;
+  if (!parsed)
+    return;
+  draftDocuments_ = std::move(parsed.value.surfaces);
+  submittedDocuments_ = draftDocuments_;
+  documentChangedThisFrame_ = true;
+  markupOutOfSync_ = false;
+}
+
 void SimulatorPresenter::DrawDocumentEditor() {
   documentChangedThisFrame_ = false;
   if (ImGui::Begin("Document")) {
-    ImGui::TextDisabled("Every document root must be a Surface");
-    ImGui::Checkbox("Auto-submit changes", &autoSubmit_);
-    if (ImGui::Button("+ Surface", {-1.0F, 0.0F})) {
-      draftDocuments_.push_back(Language::LSurface());
-      documentChangedThisFrame_ = true;
-    }
-    ImGui::Separator();
+    if (ImGui::BeginTabBar("DocumentEditors")) {
+      if (ImGui::BeginTabItem("Visual")) {
+        ImGui::TextDisabled("Every document root must be a Surface");
+        ImGui::Checkbox("Auto-submit changes", &autoSubmit_);
+        if (markupOutOfSync_) {
+          ImGui::TextColored({1.0F, 0.72F, 0.25F, 1.0F},
+                             "Visual tree and markup differ");
+          ImGui::SameLine();
+          if (ImGui::SmallButton("Replace from visual tree"))
+            RefreshMarkupFromVisualEditor();
+        }
+        if (ImGui::Button("+ Surface", {-1.0F, 0.0F})) {
+          draftDocuments_.push_back(Language::LSurface());
+          documentChangedThisFrame_ = true;
+        }
+        ImGui::Separator();
+        for (std::size_t i = 0; i < draftDocuments_.size();) {
+          if (DrawLanguageNodeEditor(draftDocuments_[i], true))
+            draftDocuments_.erase(draftDocuments_.begin() +
+                                  static_cast<std::ptrdiff_t>(i));
+          else
+            ++i;
+        }
+        ImGui::Separator();
+        if (ImGui::Button("Submit to Runtime", {-1.0F, 0.0F}))
+          submittedDocuments_ = draftDocuments_;
+        if (documentChangedThisFrame_) {
+          markupOutOfSync_ = true;
+          if (autoSubmit_)
+            submittedDocuments_ = draftDocuments_;
+        }
+        ImGui::EndTabItem();
+      }
 
-    for (std::size_t i = 0; i < draftDocuments_.size();) {
-      if (DrawLanguageNodeEditor(draftDocuments_[i], true))
-        draftDocuments_.erase(draftDocuments_.begin() +
-                              static_cast<std::ptrdiff_t>(i));
-      else
-        ++i;
+      if (ImGui::BeginTabItem("ARUI Markup")) {
+        ImGui::TextDisabled("Edit the complete document as ARUI markup.");
+        ImGui::TextDisabled("Apply with the button or Ctrl+Enter.");
+        const float diagnosticsHeight = markupDiagnostics_.empty()
+                                            ? ImGui::GetFrameHeightWithSpacing()
+                                            : 76.0F;
+        if (ImGui::InputTextMultiline("##ARUIMarkup", &markupSource_,
+                                      {-1.0F, -diagnosticsHeight},
+                                      ImGuiInputTextFlags_AllowTabInput)) {
+          markupOutOfSync_ = true;
+          markupDiagnostics_.clear();
+        }
+        const bool applyShortcut = ImGui::IsItemFocused() &&
+                                   ImGui::GetIO().KeyCtrl &&
+                                   ImGui::IsKeyPressed(ImGuiKey_Enter);
+        if (ImGui::Button("Apply Markup to Runtime", {-1.0F, 0.0F}) ||
+            applyShortcut)
+          ApplyMarkupEditor();
+        if (!markupDiagnostics_.empty()) {
+          ImGui::BeginChild("MarkupDiagnostics", {-1.0F, 58.0F}, true);
+          for (const auto &diagnostic : markupDiagnostics_)
+            ImGui::TextWrapped("Line %zu, column %zu: %s", diagnostic.line,
+                               diagnostic.column, diagnostic.message.c_str());
+          ImGui::EndChild();
+        }
+        ImGui::EndTabItem();
+      }
+      ImGui::EndTabBar();
     }
-
-    ImGui::Separator();
-    if (ImGui::Button("Submit to Runtime", {-1.0F, 0.0F}))
-      submittedDocuments_ = draftDocuments_;
-    if (autoSubmit_ && documentChangedThisFrame_)
-      submittedDocuments_ = draftDocuments_;
     ImGui::TextDisabled("Surfaces: %zu | Runtime revision: %llu",
                         draftDocuments_.size(),
                         static_cast<unsigned long long>(runtimeRevision_));
   }
   ImGui::End();
 }
-
 std::optional<std::vector<Language::LNode>>
 SimulatorPresenter::TakeSubmittedDocument() {
   auto submitted = std::move(submittedDocuments_);
@@ -679,7 +740,7 @@ void SimulatorPresenter::DrawViewport() {
         ImGui::EndCombo();
       }
       ImGui::Separator();
-      //ImGui::TextDisabled("800 x 600");
+      // ImGui::TextDisabled("800 x 600");
       ImGui::EndMenuBar();
     }
 

@@ -1,10 +1,10 @@
 #include "ARUI/Language/Parser.hpp"
 #include "ARUI/Render/Backends/OpenGL/OpenGLRenderDevice.hpp"
-#include "ARUI/Render/Painter.hpp"
 #include "ARUI/Render/RenderGraph.hpp"
 #include "ARUI/Render/Renderer.hpp"
-#include "ARUI/Render/RuntimePainter.hpp"
 #include "ARUI/Render/StandardPipeline.hpp"
+#include "ARUI/Runtime/Painter.hpp"
+#include "ARUI/Runtime/RuntimePainter.hpp"
 #include "ARUI/Runtime/RuntimeTree.hpp"
 
 #include <GLFW/glfw3.h>
@@ -14,11 +14,11 @@
 #include <imgui_stdlib.h>
 
 #include <algorithm>
-#include <glm/ext/matrix_transform.hpp>
 #include <array>
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <glm/ext/matrix_transform.hpp>
 #include <iostream>
 #include <iterator>
 #include <memory>
@@ -57,8 +57,8 @@ public:
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    window_ = glfwCreateWindow(1440, 900, "ARUI Markup Viewer", nullptr,
-                               nullptr);
+    window_ =
+        glfwCreateWindow(1440, 900, "ARUI Markup Viewer", nullptr, nullptr);
     if (!window_)
       throw std::runtime_error("GLFW failed to create the markup viewer");
     glfwSetWindowUserPointer(window_, this);
@@ -77,7 +77,7 @@ public:
     style.WindowRounding = 0.0F;
     style.ChildRounding = 0.0F;
     style.FrameRounding = 3.0F;
-    ARUI::Render::RegisterDefaultPainter(painters_);
+    ARUI::Runtime::RegisterFlatPainter(painters_);
     CreateRenderResources();
     if (initialPath.empty())
       ParseAndSubmit();
@@ -122,8 +122,7 @@ public:
   }
 
 private:
-  static void DropCallback(GLFWwindow *window, int count,
-                           const char **paths) {
+  static void DropCallback(GLFWwindow *window, int count, const char **paths) {
     if (count <= 0 || !paths || !paths[0])
       return;
     auto *viewer =
@@ -168,9 +167,8 @@ private:
       valid_ = false;
       return;
     }
-    std::ranges::sort(files_, {}, [](const auto &path) {
-      return path.filename().string();
-    });
+    std::ranges::sort(
+        files_, {}, [](const auto &path) { return path.filename().string(); });
   }
 
   void LoadFile(const std::filesystem::path &path) {
@@ -185,8 +183,7 @@ private:
                    std::istreambuf_iterator<char>{});
     sourcePath_ = path;
     std::error_code error;
-    sourceWriteTime_ =
-        std::filesystem::last_write_time(sourcePath_, error);
+    sourceWriteTime_ = std::filesystem::last_write_time(sourcePath_, error);
     if (error)
       sourceWriteTime_.reset();
     ParseAndSubmit();
@@ -196,8 +193,7 @@ private:
     if (!liveReload_ || sourcePath_.empty())
       return;
     std::error_code error;
-    const auto writeTime =
-        std::filesystem::last_write_time(sourcePath_, error);
+    const auto writeTime = std::filesystem::last_write_time(sourcePath_, error);
     if (error) {
       status_ = "Live reload cannot access " + sourcePath_.string();
       valid_ = false;
@@ -237,28 +233,36 @@ private:
   void RenderPreview() {
     renderDevice_->MakeCurrent();
     ARUI::Render::Renderer renderer(
-        *renderDevice_, standardPipeline_->Configuration({.colorAttachment = previewView_,
-                        .clearColor = true,
-                        .clearColorValue = {0.055F, 0.065F, 0.08F, 1.0F},
-                        .extent = RenderExtent,
-                        .offset = {0, 0}}));
+        *renderDevice_, standardPipeline_->Configuration(
+                            {.colorAttachment = previewView_,
+                             .clearColor = true,
+                             .clearColorValue = {0.055F, 0.065F, 0.08F, 1.0F},
+                             .extent = RenderExtent,
+                             .offset = {0, 0}}));
     ARUI::Render::RenderGraph graph;
     renderer.BeginFrame();
-    ARUI::Render::PaintContext paintContext{renderer};
+    ARUI::Runtime::PaintContext paintContext{renderer};
     for (const NodeID root : runtime_.RootChildren()) {
       const auto *surface = runtime_.Get(root);
-      const float surfaceWidth = surface ? surface->style.width.As(ARUI::Language::LengthUnit::Meter).Value() : 0.0F;
-      const float surfaceHeight = surface ? surface->style.height.As(ARUI::Language::LengthUnit::Meter).Value() : 0.0F;
-      if (surfaceWidth <= 0.0F || surfaceHeight <= 0.0F) continue;
-      const float pixelsPerMeter = std::min(
-          static_cast<float>(RenderExtent.x) / surfaceWidth,
-          static_cast<float>(RenderExtent.y) / surfaceHeight);
+      const float surfaceWidth =
+          surface ? surface->style.width.As(ARUI::Language::LengthUnit::Meter)
+                        .Value()
+                  : 0.0F;
+      const float surfaceHeight =
+          surface ? surface->style.height.As(ARUI::Language::LengthUnit::Meter)
+                        .Value()
+                  : 0.0F;
+      if (surfaceWidth <= 0.0F || surfaceHeight <= 0.0F)
+        continue;
+      const float pixelsPerMeter =
+          std::min(static_cast<float>(RenderExtent.x) / surfaceWidth,
+                   static_cast<float>(RenderExtent.y) / surfaceHeight);
       const glm::vec2 metersToNdc{
           2.0F * pixelsPerMeter / static_cast<float>(RenderExtent.x),
           2.0F * pixelsPerMeter / static_cast<float>(RenderExtent.y)};
-      const glm::mat4 localToClip = glm::scale(
-          glm::mat4{1.0F}, {metersToNdc.x, metersToNdc.y, 1.0F});
-      ARUI::Render::PaintRuntimeSurface(
+      const glm::mat4 localToClip =
+          glm::scale(glm::mat4{1.0F}, {metersToNdc.x, metersToNdc.y, 1.0F});
+      ARUI::Runtime::PaintRuntimeSurface(
           paintContext, painters_, runtime_, root,
           {.localToClip = localToClip, .pixelsPerMeter = pixelsPerMeter});
     }
@@ -273,8 +277,7 @@ private:
     if (!parsed) {
       const auto &diagnostic = parsed.diagnostics.front();
       status_ = "Line " + std::to_string(diagnostic.line) + ", column " +
-                std::to_string(diagnostic.column) + ": " +
-                diagnostic.message;
+                std::to_string(diagnostic.column) + ": " + diagnostic.message;
       valid_ = false;
       return;
     }
@@ -293,12 +296,14 @@ private:
     const ImGuiViewport *viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
-    constexpr ImGuiWindowFlags flags =
-        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus;
+    constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration |
+                                       ImGuiWindowFlags_NoMove |
+                                       ImGuiWindowFlags_NoSavedSettings |
+                                       ImGuiWindowFlags_NoBringToFrontOnFocus;
     ImGui::Begin("Markup Viewer", nullptr, flags);
 
-    const float editorWidth = std::max(340.0F, ImGui::GetContentRegionAvail().x * 0.36F);
+    const float editorWidth =
+        std::max(340.0F, ImGui::GetContentRegionAvail().x * 0.36F);
     ImGui::BeginChild("Source", {editorWidth, 0.0F}, true);
     ImGui::TextUnformatted("ARUI XML");
     ImGui::SetNextItemWidth(-80.0F);
@@ -330,8 +335,7 @@ private:
     ImGui::EndDisabled();
     ImGui::Separator();
     const float statusHeight = ImGui::GetTextLineHeightWithSpacing() * 2.0F;
-    if (ImGui::InputTextMultiline("##Markup", &source_,
-                                  {-1.0F, -statusHeight},
+    if (ImGui::InputTextMultiline("##Markup", &source_, {-1.0F, -statusHeight},
                                   ImGuiInputTextFlags_AllowTabInput))
       ParseAndSubmit();
     ImGui::PushStyleColor(ImGuiCol_Text,
@@ -365,7 +369,7 @@ private:
 
   GLFWwindow *window_{};
   RuntimeTree runtime_;
-  ARUI::Render::PainterRegistry painters_;
+  ARUI::Runtime::PainterRegistry painters_;
   std::string source_;
   std::string status_;
   std::filesystem::path sourcePath_;
