@@ -35,7 +35,8 @@ Server
   interface through its Document, Layout, Style, Interaction, and Animation
   subsystems.
 - **XR/Display** and **XR/Tracking** define portable device contracts, while
-  **XR/OpenXR** implements those contracts for an OpenXR runtime.
+  **XR/OpenXR** implements those contracts for an OpenXR runtime, including
+  headless EGL presentation, stereo views, tracking, and environment sensing.
 - **Tools/Simulator** provides a development-only display and tracking backend.
 - **Server/Manager** coordinates runtime, rendering, and XR services.
   **Server/Desktop** is the desktop executable and owns its platform window.

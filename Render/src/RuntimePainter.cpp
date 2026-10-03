@@ -23,7 +23,7 @@ void PaintRuntimeNode(PaintContext &context, const PainterRegistry &painters,
                Language::Length inheritedFontSize, float depth) {
   const auto *node = runtime.Get(id);
   if (!node || !node->visible) return;
-  const std::string_view painterName =
+  const std::string painterName =
       node->style.painter ? node->style.painter->name : "arui:default";
   const IPainter *painter = painters.Find(painterName);
   if (!painter) painter = painters.Find("arui:default");
@@ -40,9 +40,9 @@ void PaintRuntimeNode(PaintContext &context, const PainterRegistry &painters,
                   .localToWorld = centerTransform,
                   .contentOriginToWorld = contentTransform,
                   .attributes = &node->attributes,
-                  .fontSizePixels = (
-                      Language::ResolveFontSize(node->style, inheritedFontSize).As(Language::LengthUnit::Meter).Value()) *
-                      view.pixelsPerMeter,
+                  .fontSizePixels = static_cast<float>(
+                      Language::ResolveFontSize(node->style, inheritedFontSize).As(Language::LengthUnit::Meter).Value() *
+                      view.pixelsPerMeter),
                   .pixelsPerUnit = view.pixelsPerMeter,
                   .fontFamily = Language::DefaultLayoutParameters.fontFamily},
                  node->style.painterProperties, context);

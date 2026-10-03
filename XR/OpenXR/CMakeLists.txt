@@ -1,4 +1,7 @@
-add_library(ARUIOpenXR STATIC src/OpenXRTrackingProvider.cpp)
+add_library(ARUIOpenXR STATIC
+    src/OpenXRPresenter.cpp
+    src/OpenXRTrackingProvider.cpp
+    src/OpenXRViewProvider.cpp)
 add_library(ARUI::OpenXR ALIAS ARUIOpenXR)
 target_include_directories(ARUIOpenXR PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -9,6 +12,5 @@ target_link_libraries(ARUIOpenXR PUBLIC
     ARUI::XREnvironment
     OpenXR::headers
     OpenXR::openxr_loader
-    OpenGL::EGL
-    GLEW::GLEW
     spdlog::spdlog)
+

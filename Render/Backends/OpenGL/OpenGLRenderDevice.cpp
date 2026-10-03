@@ -3,6 +3,7 @@
 #include "ARUI/Render/Backends/OpenGL/OpenGLCommons.hpp"
 #include "ARUI/Render/RenderCommons.hpp"
 #include <unordered_set>
+#include <EGL/eglext.h>
 
 #if defined(TRACY_ENABLE)
 #include <tracy/Tracy.hpp>
@@ -44,40 +45,56 @@ static bool HasExtension(const std::unordered_set<std::string> &extensions,
                          std::string_view name) {
   return extensions.contains(std::string{name});
 }
-ARUI::Render::OpenGLRenderDevice::OpenGLRenderDevice() : IRenderDevice() {
-  eglDisplay_ = eglGetCurrentDisplay();
-  const EGLContext sharedContext = eglGetCurrentContext();
-  if (eglDisplay_ == EGL_NO_DISPLAY || sharedContext == EGL_NO_CONTEXT)
-    throw std::runtime_error(
-        "OpenGLRenderDevice requires a current EGL OpenGL context");
-
-  EGLint configId = 0;
-  if (eglQueryContext(eglDisplay_, sharedContext, EGL_CONFIG_ID, &configId) !=
-      EGL_TRUE)
-    throw std::runtime_error(
-        "Failed to query the GLFW EGL context configuration");
-  const EGLint configAttributes[] = {EGL_CONFIG_ID, configId, EGL_NONE};
-  EGLConfig config{};
-  EGLint configCount = 0;
-  if (eglChooseConfig(eglDisplay_, configAttributes, &config, 1,
-                      &configCount) != EGL_TRUE ||
-      configCount == 0)
-    throw std::runtime_error("Failed to find the GLFW EGL configuration");
+ARUI::Render::OpenGLRenderDevice::OpenGLRenderDevice(bool useCurrentContext)
+    : IRenderDevice() {
+  EGLContext sharedContext = EGL_NO_CONTEXT;
+  if (useCurrentContext) {
+    eglDisplay_ = eglGetCurrentDisplay();
+    sharedContext = eglGetCurrentContext();
+    if (eglDisplay_ == EGL_NO_DISPLAY || sharedContext == EGL_NO_CONTEXT)
+      throw std::runtime_error("OpenGLRenderDevice requires a current context");
+    EGLint configId = 0;
+    if (eglQueryContext(eglDisplay_, sharedContext, EGL_CONFIG_ID, &configId) !=
+        EGL_TRUE)
+      throw std::runtime_error("Failed to query the current EGL configuration");
+    const EGLint attributes[] = {EGL_CONFIG_ID, configId, EGL_NONE};
+    EGLint count = 0;
+    if (eglChooseConfig(eglDisplay_, attributes, &eglConfig_, 1, &count) !=
+            EGL_TRUE || count == 0)
+      throw std::runtime_error("Failed to find the current EGL configuration");
+  } else {
+    eglDisplay_ = eglGetPlatformDisplay(EGL_PLATFORM_SURFACELESS_MESA,
+                                        EGL_DEFAULT_DISPLAY, nullptr);
+    if (eglDisplay_ == EGL_NO_DISPLAY ||
+        eglInitialize(eglDisplay_, nullptr, nullptr) != EGL_TRUE)
+      throw std::runtime_error("Failed to initialize surfaceless EGL");
+    ownsDisplay_ = true;
+    if (eglBindAPI(EGL_OPENGL_API) != EGL_TRUE)
+      throw std::runtime_error("Failed to bind the EGL OpenGL API");
+    const EGLint attributes[] = {
+        EGL_SURFACE_TYPE, EGL_PBUFFER_BIT, EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
+        EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8,
+        EGL_ALPHA_SIZE, 8, EGL_NONE};
+    EGLint count = 0;
+    if (eglChooseConfig(eglDisplay_, attributes, &eglConfig_, 1, &count) !=
+            EGL_TRUE || count == 0)
+      throw std::runtime_error("Failed to choose a surfaceless EGL configuration");
+  }
 
   const EGLint surfaceAttributes[] = {EGL_WIDTH, 1, EGL_HEIGHT, 1, EGL_NONE};
-  eglSurface_ = eglCreatePbufferSurface(eglDisplay_, config, surfaceAttributes);
+  eglSurface_ = eglCreatePbufferSurface(eglDisplay_, eglConfig_, surfaceAttributes);
   if (eglSurface_ == EGL_NO_SURFACE)
     throw std::runtime_error("Failed to create the render-device EGL surface");
-
   if (eglBindAPI(EGL_OPENGL_API) != EGL_TRUE)
     throw std::runtime_error("Failed to bind the EGL OpenGL API");
-  const EGLint contextAttributes[] = {EGL_CONTEXT_MAJOR_VERSION, 4,
-                                      EGL_CONTEXT_MINOR_VERSION, 6, EGL_NONE};
-  eglContext_ =
-      eglCreateContext(eglDisplay_, config, sharedContext, contextAttributes);
+  const EGLint contextAttributes[] = {
+      EGL_CONTEXT_MAJOR_VERSION_KHR, 4, EGL_CONTEXT_MINOR_VERSION_KHR, 6,
+      EGL_CONTEXT_OPENGL_PROFILE_MASK_KHR,
+      EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT_KHR, EGL_NONE};
+  eglContext_ = eglCreateContext(eglDisplay_, eglConfig_, sharedContext,
+                                 contextAttributes);
   if (eglContext_ == EGL_NO_CONTEXT)
-    throw std::runtime_error(
-        "Failed to create the shared render-device EGL context");
+    throw std::runtime_error("Failed to create the render-device EGL context");
 
   ActivateContext();
   glewExperimental = GL_TRUE;
@@ -85,16 +102,16 @@ ARUI::Render::OpenGLRenderDevice::OpenGLRenderDevice() : IRenderDevice() {
   if (glewError != GLEW_OK && glewError != GLEW_ERROR_NO_GLX_DISPLAY)
     throw std::runtime_error(
         reinterpret_cast<const char *>(glewGetErrorString(glewError)));
-  glGetError(); // GLEW may generate GL_INVALID_ENUM on core contexts.
-
+  glGetError();
 #if defined(TRACY_ENABLE)
   TracyGpuContext;
 #endif
-
   glEnable(GL_DEBUG_OUTPUT);
   glDebugMessageCallback(OpenGLDebugCallback, logger.get());
-  logger->info("OpenGL Version Supported: {}",
-               reinterpret_cast<const char *>(glGetString(GL_VERSION)));
+  logger->info("OpenGL initialized: version={}, renderer={}, vendor={}",
+               reinterpret_cast<const char *>(glGetString(GL_VERSION)),
+               reinterpret_cast<const char *>(glGetString(GL_RENDERER)),
+               reinterpret_cast<const char *>(glGetString(GL_VENDOR)));
 }
 
 ARUI::Render::OpenGLRenderDevice::~OpenGLRenderDevice() {
@@ -106,6 +123,8 @@ ARUI::Render::OpenGLRenderDevice::~OpenGLRenderDevice() {
     eglDestroyContext(eglDisplay_, eglContext_);
   if (eglSurface_ != EGL_NO_SURFACE)
     eglDestroySurface(eglDisplay_, eglSurface_);
+  if (ownsDisplay_)
+    eglTerminate(eglDisplay_);
 }
 
 void ARUI::Render::OpenGLRenderDevice::ActivateContext() const {

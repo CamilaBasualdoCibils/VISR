@@ -12,6 +12,7 @@ target_link_libraries(ARUISimulator PUBLIC
     ARUI::XRDisplay
     ARUI::XRTracking
     ARUI::OpenXR
+    ARUI::RenderOpenGLOpenXR
     ARUI::RenderOpenGL
     imgui::imgui
     implot::implot

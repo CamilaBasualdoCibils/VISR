@@ -32,9 +32,12 @@ public:
     return handle;
   }
 
-  OpenGLRenderDevice();
+  explicit OpenGLRenderDevice(bool useCurrentContext = false);
   ~OpenGLRenderDevice() override;
   void MakeCurrent() const { ActivateContext(); }
+  [[nodiscard]] EGLDisplay EGLDisplayHandle() const { return eglDisplay_; }
+  [[nodiscard]] EGLConfig EGLConfigHandle() const { return eglConfig_; }
+  [[nodiscard]] EGLContext EGLContextHandle() const { return eglContext_; }
   ImageHandle CreateImage(const ImageDesc &desc) override;
 
   BufferHandle CreateBuffer(const BufferDesc &desc) override;
@@ -97,8 +100,10 @@ private:
   void ActivateContext() const;
 
   EGLDisplay eglDisplay_{EGL_NO_DISPLAY};
+  EGLConfig eglConfig_{};
   EGLSurface eglSurface_{EGL_NO_SURFACE};
   EGLContext eglContext_{EGL_NO_CONTEXT};
+  bool ownsDisplay_{};
 
   const RenderCapabilities capabilities{};
   static RenderCapabilities GetGLCapabilities();

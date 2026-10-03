@@ -22,6 +22,6 @@ function(arui_enable_runtime_instrumentation target)
   target_link_libraries(${target} PRIVATE ARUI::Instrumentation)
   if(ARUI_ENABLE_TRACY)
     target_sources(${target} PRIVATE
-      "${CMAKE_SOURCE_DIR}/Core/src/TracyAllocator.cpp")
+      "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../Core/src/TracyAllocator.cpp")
   endif()
 endfunction()

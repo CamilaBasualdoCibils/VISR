@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ARUI/XR/Environment/IXREnvironment.hpp"
+#include "ARUI/Render/RenderCommons.hpp"
 #include "ARUI/XR/Display/RenderView.hpp"
 #include "ARUI/XR/Tracking/IXRTracker.hpp"
 
@@ -9,6 +10,7 @@
 
 namespace ARUI::OpenXR {
 class OpenXRTrackingProvider;
+class IOpenXRGraphicsBinding;
 }
 
 namespace ARUI::Tools::Simulator {
@@ -17,10 +19,11 @@ class SimulatorXRTracker final : public IXRTracker, public IXREnvironment {
 public:
   SimulatorXRTracker();
   ~SimulatorXRTracker() override;
-  void InitializeOpenXR();
+  void InitializeOpenXR(
+      std::shared_ptr<OpenXR::IOpenXRGraphicsBinding> graphics);
   [[nodiscard]] glm::ivec2 GetEyeExtent(size_t eye) const noexcept;
   [[nodiscard]] std::optional<RenderView> GetEyeView(size_t eye) const;
-  void PresentToHeadset(const std::array<uint32_t, 2> &textures);
+  void PresentToHeadset(const std::array<Render::ImageViewHandle, 2> &images);
 
   std::optional<TrackedPose> GetPose(std::string_view jointName) override;
   size_t GetJoints(std::span<std::string_view> jointNames) override;

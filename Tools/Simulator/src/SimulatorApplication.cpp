@@ -1,3 +1,4 @@
+#include "ARUI/Render/Backends/OpenGL/OpenGLOpenXRBinding.hpp"
 #include "ARUI/Tools/Simulator/SimulatorApplication.hpp"
 
 #include "ARUI/Render/RenderGraph.hpp"
@@ -260,10 +261,11 @@ SimulatorApplication::SimulatorApplication()
     : tracker_(std::make_shared<SimulatorXRTracker>()),
       views_(std::make_shared<SimulatorViewProvider>(tracker_)),
       presenter_(std::make_shared<SimulatorPresenter>(tracker_, views_)),
-      renderDevice_(std::make_shared<Render::OpenGLRenderDevice>()) {
+      renderDevice_(std::make_shared<Render::OpenGLRenderDevice>(true)) {
   presenter_->SetRenderDevice(renderDevice_);
   renderDevice_->MakeCurrent();
-  tracker_->InitializeOpenXR();
+  tracker_->InitializeOpenXR(
+      std::make_shared<Render::OpenGLOpenXRBinding>(renderDevice_));
 }
 
 int SimulatorApplication::Run() {
@@ -341,9 +343,7 @@ int SimulatorApplication::Run() {
       presenter_->Present(frameViews[i], imageViews[i]);
     }
     renderDevice_->MakeCurrent();
-    tracker_->PresentToHeadset({
-        renderDevice_->GetGLTextureView(imageViews[1]).id,
-        renderDevice_->GetGLTextureView(imageViews[2]).id});
+    tracker_->PresentToHeadset({imageViews[1], imageViews[2]});
     presenter_->EndFrame();
     views_->EndFrame();
     nextFrame += framePeriod;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ARUI/XR/Environment/IXREnvironment.hpp"
+#include "ARUI/Render/RenderCommons.hpp"
 #include "ARUI/XR/Display/RenderView.hpp"
 #include "ARUI/XR/Tracking/IXRTracker.hpp"
 
@@ -10,10 +11,13 @@
 
 namespace ARUI::OpenXR {
 
-// Shares the simulator EGL OpenGL context and submits stereo images to OpenXR.
+class IOpenXRGraphicsBinding;
+
+// Backend-neutral OpenXR runtime, tracking, and environment implementation.
 class OpenXRTrackingProvider final : public IXRTracker, public IXREnvironment {
 public:
-  static std::unique_ptr<OpenXRTrackingProvider> TryCreate();
+  static std::unique_ptr<OpenXRTrackingProvider>
+  TryCreate(std::shared_ptr<IOpenXRGraphicsBinding> graphics);
   ~OpenXRTrackingProvider() override;
 
   OpenXRTrackingProvider(const OpenXRTrackingProvider &) = delete;
@@ -30,6 +34,7 @@ public:
   std::optional<XRDepthFrame> GetDepthFrame() override;
 
   [[nodiscard]] bool IsRunning() const noexcept;
+  [[nodiscard]] bool ShouldExit() const noexcept;
   [[nodiscard]] bool HasFrameViews() const noexcept;
   [[nodiscard]] const std::array<RenderView, 2> &GetFrameViews() const noexcept;
   [[nodiscard]] bool SupportsHandTracking() const noexcept;
@@ -43,14 +48,17 @@ public:
   [[nodiscard]] int32_t GetBodyJointParent(size_t joint) const noexcept;
   [[nodiscard]] glm::ivec2 GetRecommendedExtent(size_t eye) const noexcept;
   void BeginFrame();
-  void PresentFrame(const std::array<uint32_t, 2> &textures);
+  void PresentFrame(const std::array<Render::ImageViewHandle, 2> &images,
+                    const std::array<bool, 2> &submitted);
 
 private:
-  OpenXRTrackingProvider();
+  explicit OpenXRTrackingProvider(
+      std::shared_ptr<IOpenXRGraphicsBinding> graphics);
   bool Initialize();
 
   struct State;
   std::unique_ptr<State> state_;
+  std::shared_ptr<IOpenXRGraphicsBinding> graphics_;
 };
 
 } // namespace ARUI::OpenXR

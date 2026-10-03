@@ -19,8 +19,9 @@ SimulatorXRTracker::SimulatorXRTracker() {
 
 SimulatorXRTracker::~SimulatorXRTracker() = default;
 
-void SimulatorXRTracker::InitializeOpenXR() {
-  openXR_ = OpenXR::OpenXRTrackingProvider::TryCreate();
+void SimulatorXRTracker::InitializeOpenXR(
+    std::shared_ptr<OpenXR::IOpenXRGraphicsBinding> graphics) {
+  openXR_ = OpenXR::OpenXRTrackingProvider::TryCreate(std::move(graphics));
 }
 
 glm::ivec2 SimulatorXRTracker::GetEyeExtent(size_t eye) const noexcept {
@@ -34,9 +35,9 @@ std::optional<RenderView> SimulatorXRTracker::GetEyeView(size_t eye) const {
 }
 
 void SimulatorXRTracker::PresentToHeadset(
-    const std::array<uint32_t, 2> &textures) {
+    const std::array<Render::ImageViewHandle, 2> &images) {
   if (openXR_)
-    openXR_->PresentFrame(textures);
+    openXR_->PresentFrame(images, {true, true});
 }
 
 bool SimulatorXRTracker::HasOpenXR() const noexcept {

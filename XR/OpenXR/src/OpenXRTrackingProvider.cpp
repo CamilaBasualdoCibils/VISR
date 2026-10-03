@@ -1,10 +1,5 @@
 #include "ARUI/XR/OpenXR/OpenXRTrackingProvider.hpp"
-
-#include <EGL/egl.h>
-#include <GL/glew.h>
-#define XR_USE_GRAPHICS_API_OPENGL
-#define XR_USE_PLATFORM_EGL
-#include <openxr/openxr_platform.h>
+#include "ARUI/XR/OpenXR/IOpenXRGraphicsBinding.hpp"
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
@@ -124,9 +119,7 @@ RenderView ToRenderView(const char *name, const XrView &eye,
           .viewportSize = extent};
 }
 
-PFN_xrVoidFunction GetEGLProcAddress(const char *name) {
-  return reinterpret_cast<PFN_xrVoidFunction>(eglGetProcAddress(name));
-}
+
 } // namespace
 
 struct OpenXRTrackingProvider::State {
@@ -161,7 +154,6 @@ struct OpenXRTrackingProvider::State {
   float bodyConfidence{};
   uint32_t skeletonChangedCount{};
   std::array<XrSwapchain, 2> swapchains{XR_NULL_HANDLE, XR_NULL_HANDLE};
-  std::array<std::vector<XrSwapchainImageOpenGLKHR>, 2> swapchainImages;
   std::array<glm::ivec2, 2> extents{};
   std::array<XrView, 2> locatedViews{};
   std::array<RenderView, 2> frameViews{};
@@ -179,7 +171,7 @@ struct OpenXRTrackingProvider::State {
   PFN_xrEnumerateEnvironmentDepthSwapchainImagesMETA enumerateDepthImages{};
   PFN_xrGetEnvironmentDepthSwapchainStateMETA getDepthSwapchainState{};
   PFN_xrAcquireEnvironmentDepthImageMETA acquireDepthImage{};
-  std::vector<XrSwapchainImageOpenGLKHR> depthImages;
+  uint32_t depthImageCount{};
   uint32_t depthWidth{};
   uint32_t depthHeight{};
   bool supportsDepth{};
@@ -194,10 +186,12 @@ struct OpenXRTrackingProvider::State {
   bool frameShouldRender{};
   bool viewsValid{};
   bool warnedSubmission{};
+  bool exitRequested{};
 };
 
-OpenXRTrackingProvider::OpenXRTrackingProvider()
-    : state_(std::make_unique<State>()) {}
+OpenXRTrackingProvider::OpenXRTrackingProvider(
+    std::shared_ptr<IOpenXRGraphicsBinding> graphics)
+    : state_(std::make_unique<State>()), graphics_(std::move(graphics)) {}
 
 OpenXRTrackingProvider::~OpenXRTrackingProvider() {
   if (!state_)
@@ -234,33 +228,21 @@ OpenXRTrackingProvider::~OpenXRTrackingProvider() {
     xrDestroyInstance(state_->instance);
 }
 
-std::unique_ptr<OpenXRTrackingProvider> OpenXRTrackingProvider::TryCreate() {
-  auto provider =
-      std::unique_ptr<OpenXRTrackingProvider>(new OpenXRTrackingProvider());
+std::unique_ptr<OpenXRTrackingProvider> OpenXRTrackingProvider::TryCreate(
+    std::shared_ptr<IOpenXRGraphicsBinding> graphics) {
+  if (!graphics)
+    return nullptr;
+  auto provider = std::unique_ptr<OpenXRTrackingProvider>(
+      new OpenXRTrackingProvider(std::move(graphics)));
   if (provider->Initialize()) {
-    spdlog::info("OpenXR EGL stereo session created");
+    spdlog::info("OpenXR stereo session created");
     return provider;
   }
-  spdlog::info("OpenXR EGL stereo session unavailable; using manual views");
+  spdlog::info("OpenXR stereo session unavailable");
   return nullptr;
 }
 
 bool OpenXRTrackingProvider::Initialize() {
-  const EGLDisplay display = eglGetCurrentDisplay();
-  const EGLContext context = eglGetCurrentContext();
-  if (display == EGL_NO_DISPLAY || context == EGL_NO_CONTEXT)
-    return false;
-  EGLint configId = 0;
-  if (eglQueryContext(display, context, EGL_CONFIG_ID, &configId) != EGL_TRUE)
-    return false;
-  const EGLint configAttributes[] = {EGL_CONFIG_ID, configId, EGL_NONE};
-  EGLConfig config{};
-  EGLint configCount = 0;
-  if (eglChooseConfig(display, configAttributes, &config, 1, &configCount) !=
-          EGL_TRUE ||
-      configCount == 0)
-    return false;
-
   uint32_t extensionCount = 0;
   if (xrEnumerateInstanceExtensionProperties(nullptr, 0, &extensionCount,
                                              nullptr) != XR_SUCCESS)
@@ -277,18 +259,18 @@ bool OpenXRTrackingProvider::Initialize() {
                          return std::strcmp(extension.extensionName, name) == 0;
                        });
   };
-  if (!hasExtension(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME) ||
-      !hasExtension(XR_MNDX_EGL_ENABLE_EXTENSION_NAME))
-    return false;
-
   const bool depthExtension =
       hasExtension(XR_META_ENVIRONMENT_DEPTH_EXTENSION_NAME);
   const bool handExtension = hasExtension(XR_EXT_HAND_TRACKING_EXTENSION_NAME);
   const bool bodyExtension = hasExtension(XR_FB_BODY_TRACKING_EXTENSION_NAME);
   const bool fullBodyExtension =
       bodyExtension && hasExtension(XR_META_BODY_TRACKING_FULL_BODY_EXTENSION_NAME);
-  std::vector<const char *> enabledExtensions = {
-      XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, XR_MNDX_EGL_ENABLE_EXTENSION_NAME};
+  std::vector<const char *> enabledExtensions =
+      graphics_->RequiredInstanceExtensions();
+  if (enabledExtensions.empty() ||
+      std::any_of(enabledExtensions.begin(), enabledExtensions.end(),
+                  [&](const char *name) { return !hasExtension(name); }))
+    return false;
   if (handExtension)
     enabledExtensions.push_back(XR_EXT_HAND_TRACKING_EXTENSION_NAME);
   else
@@ -300,7 +282,7 @@ bool OpenXRTrackingProvider::Initialize() {
   if (depthExtension)
     enabledExtensions.push_back(XR_META_ENVIRONMENT_DEPTH_EXTENSION_NAME);
   XrInstanceCreateInfo instanceInfo{XR_TYPE_INSTANCE_CREATE_INFO};
-  std::strncpy(instanceInfo.applicationInfo.applicationName, "ARUI Simulator",
+  std::strncpy(instanceInfo.applicationInfo.applicationName, "ARUI Server",
                XR_MAX_APPLICATION_NAME_SIZE - 1);
   std::strncpy(instanceInfo.applicationInfo.engineName, "ARUI",
                XR_MAX_ENGINE_NAME_SIZE - 1);
@@ -367,26 +349,6 @@ bool OpenXRTrackingProvider::Initialize() {
                  state_->supportsDepth);
   }
 
-  PFN_xrGetOpenGLGraphicsRequirementsKHR getRequirements = nullptr;
-  if (xrGetInstanceProcAddr(
-          state_->instance, "xrGetOpenGLGraphicsRequirementsKHR",
-          reinterpret_cast<PFN_xrVoidFunction *>(&getRequirements)) !=
-          XR_SUCCESS ||
-      !getRequirements)
-    return false;
-  XrGraphicsRequirementsOpenGLKHR requirements{
-      XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR};
-  if (getRequirements(state_->instance, system, &requirements) != XR_SUCCESS)
-    return false;
-  GLint major = 0;
-  GLint minor = 0;
-  glGetIntegerv(GL_MAJOR_VERSION, &major);
-  glGetIntegerv(GL_MINOR_VERSION, &minor);
-  const XrVersion glVersion = XR_MAKE_VERSION(major, minor, 0);
-  if (glVersion < requirements.minApiVersionSupported ||
-      glVersion > requirements.maxApiVersionSupported)
-    return false;
-
   uint32_t blendModeCount = 0;
   if (xrEnumerateEnvironmentBlendModes(
           state_->instance, system, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
@@ -419,16 +381,8 @@ bool OpenXRTrackingProvider::Initialize() {
           viewConfigs.size(), &viewCount, viewConfigs.data()) != XR_SUCCESS)
     return false;
 
-  XrGraphicsBindingEGLMNDX binding{XR_TYPE_GRAPHICS_BINDING_EGL_MNDX};
-  binding.getProcAddress = GetEGLProcAddress;
-  binding.display = display;
-  binding.config = config;
-  binding.context = context;
-  XrSessionCreateInfo sessionInfo{XR_TYPE_SESSION_CREATE_INFO};
-  sessionInfo.next = &binding;
-  sessionInfo.systemId = system;
   const XrResult sessionResult =
-      xrCreateSession(state_->instance, &sessionInfo, &state_->session);
+      graphics_->CreateSession(state_->instance, system, &state_->session);
   if (sessionResult != XR_SUCCESS) {
     spdlog::warn("OpenXR xrCreateSession failed: {}",
                  static_cast<int>(sessionResult));
@@ -444,12 +398,7 @@ bool OpenXRTrackingProvider::Initialize() {
   if (xrEnumerateSwapchainFormats(state_->session, formatCount, &formatCount,
                                   formats.data()) != XR_SUCCESS)
     return false;
-  int64_t colorFormat = formats.front();
-  if (std::find(formats.begin(), formats.end(), GL_RGBA8) != formats.end())
-    colorFormat = GL_RGBA8;
-  else if (std::find(formats.begin(), formats.end(), GL_SRGB8_ALPHA8) !=
-           formats.end())
-    colorFormat = GL_SRGB8_ALPHA8;
+  const int64_t colorFormat = graphics_->SelectColorFormat(formats);
 
   for (size_t i = 0; i < 2; ++i) {
     state_->extents[i] = {
@@ -467,18 +416,7 @@ bool OpenXRTrackingProvider::Initialize() {
     if (xrCreateSwapchain(state_->session, &swapchainInfo,
                           &state_->swapchains[i]) != XR_SUCCESS)
       return false;
-    uint32_t imageCount = 0;
-    if (xrEnumerateSwapchainImages(state_->swapchains[i], 0, &imageCount,
-                                   nullptr) != XR_SUCCESS ||
-        imageCount == 0)
-      return false;
-    state_->swapchainImages[i].resize(imageCount);
-    for (auto &image : state_->swapchainImages[i])
-      image.type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
-    if (xrEnumerateSwapchainImages(
-            state_->swapchains[i], imageCount, &imageCount,
-            reinterpret_cast<XrSwapchainImageBaseHeader *>(
-                state_->swapchainImages[i].data())) != XR_SUCCESS)
+    if (!graphics_->EnumerateSwapchainImages(state_->swapchains[i], i))
       return false;
   }
 
@@ -538,30 +476,21 @@ bool OpenXRTrackingProvider::Initialize() {
           state_->depthHeight = swapchainState.height;
         }
       }
-      uint32_t imageCount = 0;
-      if (result == XR_SUCCESS)
-        result = state_->enumerateDepthImages(state_->depthSwapchain, 0,
-                                               &imageCount, nullptr);
-      if (result == XR_SUCCESS && imageCount > 0) {
-        state_->depthImages.resize(imageCount);
-        for (auto &image : state_->depthImages)
-          image.type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
-        result = state_->enumerateDepthImages(
-            state_->depthSwapchain, imageCount, &imageCount,
-            reinterpret_cast<XrSwapchainImageBaseHeader *>(
-                state_->depthImages.data()));
-      }
-      if (result == XR_SUCCESS && imageCount > 0) {
+      if (result == XR_SUCCESS &&
+          !graphics_->EnumerateDepthImages(state_->enumerateDepthImages,
+                                           state_->depthSwapchain))
+        result = XR_ERROR_RUNTIME_FAILURE;
+      if (result == XR_SUCCESS) {
         result = state_->startDepthProvider(state_->depthProvider);
         state_->depthStarted = result == XR_SUCCESS;
       }
-      if (result != XR_SUCCESS || imageCount == 0) {
+      if (result != XR_SUCCESS) {
         spdlog::warn("OpenXR environment depth initialization failed: {}",
                      static_cast<int>(result));
         state_->supportsDepth = false;
       } else {
-        spdlog::info("OpenXR environment depth ready: {}x{}, {} images",
-                     state_->depthWidth, state_->depthHeight, imageCount);
+        spdlog::info("OpenXR environment depth ready: {}x{}",
+                     state_->depthWidth, state_->depthHeight);
       }
     } else {
       state_->supportsDepth = false;
@@ -642,7 +571,7 @@ bool OpenXRTrackingProvider::Initialize() {
   XrActionSetCreateInfo actionSetInfo{XR_TYPE_ACTION_SET_CREATE_INFO};
   std::strncpy(actionSetInfo.actionSetName, "simulator_tracking",
                XR_MAX_ACTION_SET_NAME_SIZE - 1);
-  std::strncpy(actionSetInfo.localizedActionSetName, "Simulator Tracking",
+  std::strncpy(actionSetInfo.localizedActionSetName, "ARUI Tracking",
                XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE - 1);
   if (xrCreateActionSet(state_->instance, &actionSetInfo, &state_->actionSet) !=
       XR_SUCCESS)
@@ -820,8 +749,7 @@ std::optional<XRDepthFrame> OpenXRTrackingProvider::GetDepthFrame() {
       state_->depthProvider, &acquireInfo, &image);
   if (result == XR_ENVIRONMENT_DEPTH_NOT_AVAILABLE_META)
     return std::nullopt;
-  if (result != XR_SUCCESS ||
-      image.swapchainIndex >= state_->depthImages.size()) {
+  if (result != XR_SUCCESS) {
     if (!state_->warnedDepthAcquire)
       spdlog::warn("OpenXR environment depth acquisition failed: {}",
                    static_cast<int>(result));
@@ -831,7 +759,9 @@ std::optional<XRDepthFrame> OpenXRTrackingProvider::GetDepthFrame() {
   state_->warnedDepthAcquire = false;
 
   XRDepthFrame frame;
-  frame.nativeImage = state_->depthImages[image.swapchainIndex].image;
+  const auto [backend, nativeImage] = graphics_->DepthImage(image.swapchainIndex);
+  frame.backend = backend;
+  frame.nativeImage = nativeImage;
   frame.imageIndex = image.swapchainIndex;
   frame.width = state_->depthWidth;
   frame.height = state_->depthHeight;
@@ -858,6 +788,10 @@ std::optional<XRDepthFrame> OpenXRTrackingProvider::GetDepthFrame() {
 
 bool OpenXRTrackingProvider::IsRunning() const noexcept {
   return state_->running;
+}
+
+bool OpenXRTrackingProvider::ShouldExit() const noexcept {
+  return state_->exitRequested;
 }
 
 bool OpenXRTrackingProvider::HasFrameViews() const noexcept {
@@ -893,10 +827,12 @@ void OpenXRTrackingProvider::PollEvents() {
         } else if (changed.state == XR_SESSION_STATE_EXITING ||
                    changed.state == XR_SESSION_STATE_LOSS_PENDING) {
           state_->running = false;
+          state_->exitRequested = true;
         }
       }
     } else if (event.type == XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING) {
       state_->running = false;
+      state_->exitRequested = true;
     }
     event = {XR_TYPE_EVENT_DATA_BUFFER};
   }
@@ -1061,7 +997,8 @@ void OpenXRTrackingProvider::BeginFrame() {
 }
 
 void OpenXRTrackingProvider::PresentFrame(
-    const std::array<uint32_t, 2> &textures) {
+    const std::array<Render::ImageViewHandle, 2> &images,
+    const std::array<bool, 2> &submitted) {
   if (!state_->frameBegun)
     return;
 
@@ -1083,28 +1020,11 @@ void OpenXRTrackingProvider::PresentFrame(
         copied = false;
         break;
       }
-      GLuint readFramebuffer = 0;
-      GLuint drawFramebuffer = 0;
-      glCreateFramebuffers(1, &readFramebuffer);
-      glCreateFramebuffers(1, &drawFramebuffer);
-      glNamedFramebufferTexture(readFramebuffer, GL_COLOR_ATTACHMENT0,
-                                textures[i], 0);
-      glNamedFramebufferTexture(drawFramebuffer, GL_COLOR_ATTACHMENT0,
-                                state_->swapchainImages[i][index].image, 0);
-      if (glCheckNamedFramebufferStatus(readFramebuffer, GL_READ_FRAMEBUFFER) ==
-              GL_FRAMEBUFFER_COMPLETE &&
-          glCheckNamedFramebufferStatus(drawFramebuffer, GL_DRAW_FRAMEBUFFER) ==
-              GL_FRAMEBUFFER_COMPLETE) {
-        glBlitNamedFramebuffer(readFramebuffer, drawFramebuffer, 0, 0,
-                               state_->extents[i].x, state_->extents[i].y, 0, 0,
-                               state_->extents[i].x, state_->extents[i].y,
-                               GL_COLOR_BUFFER_BIT, GL_NEAREST);
-      } else {
+      if (!submitted[i] ||
+          !graphics_->CopyRenderTarget(i, index, images[i],
+                                       state_->extents[i].x,
+                                       state_->extents[i].y))
         copied = false;
-      }
-      glDeleteFramebuffers(1, &readFramebuffer);
-      glDeleteFramebuffers(1, &drawFramebuffer);
-      glFlush();
       XrSwapchainImageReleaseInfo releaseInfo{
           XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
       if (xrReleaseSwapchainImage(state_->swapchains[i], &releaseInfo) !=

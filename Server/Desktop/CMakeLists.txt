@@ -1,8 +1,8 @@
-add_executable(AruiServer main.cpp AruiDesktop.cpp)
-target_link_libraries(AruiServer PRIVATE
+add_executable(AruiDesktop main.cpp AruiDesktop.cpp)
+target_link_libraries(AruiDesktop PRIVATE
     ARUI::ServerManager
-    ARUI::Simulator
     ARUI::RenderOpenGL
-    ARUI::RenderVulkan
+    ARUI::OpenXR
+    ARUI::RenderOpenGLOpenXR
     Boost::program_options)
-arui_enable_runtime_instrumentation(AruiServer)
+arui_enable_runtime_instrumentation(AruiDesktop)

@@ -208,7 +208,7 @@ private:
   }
 
   void CreateRenderResources() {
-    renderDevice_ = std::make_unique<ARUI::Render::OpenGLRenderDevice>();
+    renderDevice_ = std::make_unique<ARUI::Render::OpenGLRenderDevice>(true);
     previewImage_ = renderDevice_->CreateImage(
         {.extent = {RenderExtent.x, RenderExtent.y, 1},
          .format = ARUI::Render::ImageFormat::R8G8B8A8_UNORM,
