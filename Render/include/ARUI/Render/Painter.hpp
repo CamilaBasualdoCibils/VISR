@@ -15,13 +15,20 @@ struct PaintNode {
   Language::LNodeType type{};
   glm::vec2 size{};
   glm::mat4 localToWorld{1.0F};
+  // Top-left content origin supplied by layout (positive Y points up).
+  glm::mat4 contentOriginToWorld{1.0F};
   const Language::Attributes *attributes{};
+  float fontSizePixels{16.0F};
+  float pixelsPerUnit{1.0F};
+  std::string_view fontFamily{"Noto Sans"};
 };
 using ComputedPainterStyle = Language::PainterStyleProperties;
 
 class PaintContext {
 public:
   explicit PaintContext(IRenderer &renderer) : renderer_(renderer) {}
+  void FillPath(const FillPathRenderObject &v) { renderer_.FillPath(v); }
+  void StrokePath(const StrokePathRenderObject &v) { renderer_.StrokePath(v); }
   void DrawSurface(const SurfaceRenderObject &v) { renderer_.Submit(v); }
   void DrawShape(const ShapeRenderObject &v) { renderer_.Submit(v); }
   void DrawCurve(const CurveRenderObject &v) { renderer_.Submit(v); }
@@ -55,12 +62,16 @@ public:
   void Paint(const PaintNode &, const ComputedPainterStyle &,
              PaintContext &) const override;
 private:
-  Language::PainterStyleSchema schema_{{ 
-      {"color", Language::PainterStyleType::Color, true},
-      {"background-color", Language::PainterStyleType::Color, false},
-      {"opacity", Language::PainterStyleType::Double, true},
+  Language::PainterStyleSchema schema_{{
+      {"fill", Language::PainterStyleType::Color, false, true},
+      {"stroke", Language::PainterStyleType::Color, false, true},
+      {"stroke-width", Language::PainterStyleType::Length, false},
+      {"font-size", Language::PainterStyleType::Length, true},
+      {"font-family", Language::PainterStyleType::String, true},
   }};
 };
+
+using DefaultPanelPainter = DefaultPainter;
 
 void RegisterDefaultPainter(PainterRegistry &registry);
 } // namespace ARUI::Render

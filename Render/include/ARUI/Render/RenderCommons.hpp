@@ -25,6 +25,8 @@ struct ImageDesc {
   uint32_t sampleCount = 1;
 
   ImageUsage usage;
+  // Optional tightly packed initial pixels, copied by CreateImage.
+  std::span<const std::byte> initialData{};
   ImageType type = ImageType::Image2D;
 };
 struct ImageViewTag{};

@@ -679,7 +679,7 @@ void SimulatorPresenter::DrawViewport() {
         ImGui::EndCombo();
       }
       ImGui::Separator();
-      ImGui::TextDisabled("800 x 600");
+      //ImGui::TextDisabled("800 x 600");
       ImGui::EndMenuBar();
     }
 

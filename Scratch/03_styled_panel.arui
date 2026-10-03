@@ -60,7 +60,9 @@
                     <panel class="control">
                         <text>Next</text>
                     </panel>
-
+                    <panel class="Heartbeat">
+                        <text>Heartbeat state=fitnessPal.HeartRate</text>
+                    </panel>
                 </row>
             </column>
         </panel>

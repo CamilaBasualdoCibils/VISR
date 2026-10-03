@@ -3,8 +3,9 @@
 #include "ARUI/Render/Painter.hpp"
 #include "ARUI/Render/RenderGraph.hpp"
 #include "ARUI/Render/Renderer.hpp"
+#include "ARUI/Render/RuntimePainter.hpp"
+#include "ARUI/Render/StandardPipeline.hpp"
 #include "ARUI/Runtime/RuntimeTree.hpp"
-#include "ShaderRegistry.hpp"
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -36,64 +37,12 @@ using ARUI::Runtime::NodeID;
 using ARUI::Runtime::RNode;
 using ARUI::Runtime::RuntimeTree;
 
-constexpr std::string_view DefaultMarkup = R"(<surface>
-  <panel>
-    Hello world
-  </panel>
-</surface>)";
+constexpr std::string_view DefaultMarkup = R"(<arui>
+  <surface width="20cm" height="10cm">
+    <text>Hello, ARUI!</text>
+  </surface>
+</arui>)";
 constexpr glm::uvec2 RenderExtent{1280, 720};
-
-void PaintNode(ARUI::Render::PaintContext &context,
-               const ARUI::Render::PainterRegistry &painters,
-               const RuntimeTree &runtime, NodeID id, glm::vec2 minimum,
-               glm::vec2 maximum, float depth = 0.0F) {
-  const RNode *node = runtime.Get(id);
-  if (!node || !node->visible)
-    return;
-
-  const std::string_view painterName =
-      node->style.painter ? node->style.painter->name : "default";
-  const ARUI::Render::IPainter *painter = painters.Find(painterName);
-  if (!painter)
-    painter = painters.Find("default");
-
-  const glm::vec2 size = glm::max(maximum - minimum, glm::vec2{0.001F});
-  const glm::vec2 center = (minimum + maximum) * 0.5F;
-  const glm::mat4 transform =
-      glm::translate(glm::mat4{1.0F}, {center.x, center.y, depth});
-  painter->Paint({.type = node->type,
-                  .size = size,
-                  .localToWorld = transform,
-                  .attributes = &node->attributes},
-                 node->style.painterProperties, context);
-
-  if (node->children.empty())
-    return;
-
-  constexpr float padding = 0.055F;
-  constexpr float gap = 0.025F;
-  const glm::vec2 innerMin = minimum + glm::vec2{padding};
-  const glm::vec2 innerMax = maximum - glm::vec2{padding};
-  const glm::vec2 innerSize =
-      glm::max(innerMax - innerMin, glm::vec2{0.001F});
-  const float count = static_cast<float>(node->children.size());
-
-  for (std::size_t i = 0; i < node->children.size(); ++i) {
-    glm::vec2 childMin = innerMin;
-    glm::vec2 childMax = innerMax;
-    if (node->type == LNodeType::Row) {
-      const float itemWidth = (innerSize.x - gap * (count - 1.0F)) / count;
-      childMin.x += static_cast<float>(i) * (itemWidth + gap);
-      childMax.x = childMin.x + itemWidth;
-    } else if (node->type != LNodeType::Stack) {
-      const float itemHeight = (innerSize.y - gap * (count - 1.0F)) / count;
-      childMin.y += static_cast<float>(i) * (itemHeight + gap);
-      childMax.y = childMin.y + itemHeight;
-    }
-    PaintNode(context, painters, runtime, node->children[i], childMin,
-              childMax, depth - 0.001F);
-  }
-}
 
 class MarkupViewer {
 public:
@@ -164,7 +113,7 @@ public:
       int height = 0;
       glfwGetFramebufferSize(window_, &width, &height);
       glViewport(0, 0, width, height);
-      glClearColor(0.025F, 0.03F, 0.04F, 1.0F);
+      glClearColor(0, 0, 0, 1.0F);
       glClear(GL_COLOR_BUFFER_BIT);
       ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
       glfwSwapBuffers(window_);
@@ -271,35 +220,15 @@ private:
         {.image = previewImage_,
          .format = ARUI::Render::ImageFormat::R8G8B8A8_UNORM});
 
-    const auto &vertexShader =
-        ARUI::Shaders::OpenGL::GetShader("test.vert");
-    const auto &fragmentShader =
-        ARUI::Shaders::OpenGL::GetShader("test.frag");
-    vertexModule_ = renderDevice_->CreateShaderModule(
-        {.stage = ARUI::Render::ShaderStageFlags::Vertex,
-         .spirv = std::as_bytes(vertexShader.spirv)});
-    fragmentModule_ = renderDevice_->CreateShaderModule(
-        {.stage = ARUI::Render::ShaderStageFlags::Fragment,
-         .spirv = std::as_bytes(fragmentShader.spirv)});
-    pipeline_ = renderDevice_->CreatePipeline(
-        {.vertexShader = vertexModule_,
-         .fragmentShader = fragmentModule_,
-         .vertexLayout =
-             {.bindings = {{.binding = 0, .stride = sizeof(glm::vec3)}},
-              .attributes = {{.location = 0,
-                              .binding = 0,
-                              .format =
-                                  ARUI::Render::VertexFormat::Float3}}},
-         .colorFormats = {ARUI::Render::ImageFormat::R8G8B8A8_UNORM}});
+    standardPipeline_ =
+        std::make_unique<ARUI::Render::StandardPipeline>(*renderDevice_);
   }
 
   void DestroyRenderResources() {
     if (!renderDevice_)
       return;
     renderDevice_->MakeCurrent();
-    renderDevice_->Destroy(pipeline_);
-    renderDevice_->Destroy(fragmentModule_);
-    renderDevice_->Destroy(vertexModule_);
+    standardPipeline_.reset();
     renderDevice_->Destroy(previewView_);
     renderDevice_->Destroy(previewImage_);
     renderDevice_.reset();
@@ -308,19 +237,31 @@ private:
   void RenderPreview() {
     renderDevice_->MakeCurrent();
     ARUI::Render::Renderer renderer(
-        *renderDevice_,
-        {.pipeline = pipeline_,
-         .renderPass = {.colorAttachment = previewView_,
+        *renderDevice_, standardPipeline_->Configuration({.colorAttachment = previewView_,
                         .clearColor = true,
                         .clearColorValue = {0.055F, 0.065F, 0.08F, 1.0F},
                         .extent = RenderExtent,
-                        .offset = {0, 0}}});
+                        .offset = {0, 0}}));
     ARUI::Render::RenderGraph graph;
     renderer.BeginFrame();
     ARUI::Render::PaintContext paintContext{renderer};
-    for (const NodeID root : runtime_.RootChildren())
-      PaintNode(paintContext, painters_, runtime_, root, {-1.0F, -1.0F},
-                {1.0F, 1.0F});
+    for (const NodeID root : runtime_.RootChildren()) {
+      const auto *surface = runtime_.Get(root);
+      const float surfaceWidth = surface ? surface->style.width.As(ARUI::Language::LengthUnit::Meter).Value() : 0.0F;
+      const float surfaceHeight = surface ? surface->style.height.As(ARUI::Language::LengthUnit::Meter).Value() : 0.0F;
+      if (surfaceWidth <= 0.0F || surfaceHeight <= 0.0F) continue;
+      const float pixelsPerMeter = std::min(
+          static_cast<float>(RenderExtent.x) / surfaceWidth,
+          static_cast<float>(RenderExtent.y) / surfaceHeight);
+      const glm::vec2 metersToNdc{
+          2.0F * pixelsPerMeter / static_cast<float>(RenderExtent.x),
+          2.0F * pixelsPerMeter / static_cast<float>(RenderExtent.y)};
+      const glm::mat4 localToClip = glm::scale(
+          glm::mat4{1.0F}, {metersToNdc.x, metersToNdc.y, 1.0F});
+      ARUI::Render::PaintRuntimeSurface(
+          paintContext, painters_, runtime_, root,
+          {.localToClip = localToClip, .pixelsPerMeter = pixelsPerMeter});
+    }
     renderer.BuildRenderGraph(graph);
     graph.Compile();
     graph.Execute(*renderDevice_);
@@ -438,9 +379,7 @@ private:
   std::unique_ptr<ARUI::Render::OpenGLRenderDevice> renderDevice_;
   ARUI::Render::ImageHandle previewImage_;
   ARUI::Render::ImageViewHandle previewView_;
-  ARUI::Render::ShaderModuleHandle vertexModule_;
-  ARUI::Render::ShaderModuleHandle fragmentModule_;
-  ARUI::Render::GraphicsPipelineHandle pipeline_;
+  std::unique_ptr<ARUI::Render::StandardPipeline> standardPipeline_;
 };
 
 } // namespace

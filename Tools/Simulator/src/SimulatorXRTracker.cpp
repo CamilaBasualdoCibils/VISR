@@ -24,7 +24,7 @@ void SimulatorXRTracker::InitializeOpenXR() {
 }
 
 glm::ivec2 SimulatorXRTracker::GetEyeExtent(size_t eye) const noexcept {
-  return openXR_ ? openXR_->GetRecommendedExtent(eye) : glm::ivec2{800, 600};
+  return openXR_ ? openXR_->GetRecommendedExtent(eye) : glm::ivec2{1832, 1920};
 }
 
 std::optional<RenderView> SimulatorXRTracker::GetEyeView(size_t eye) const {

@@ -1,9 +1,13 @@
 #include "ARUI/Render/Renderer.hpp"
+#include "ARUI/Render/Font.hpp"
 
 #include "ARUI/Render/IRenderCommandList.hpp"
 #include "ARUI/Render/IRenderDevice.hpp"
 #include "ARUI/Render/RenderGraph.hpp"
 
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstddef>
 #include <span>
 #include <stdexcept>
@@ -14,6 +18,8 @@ namespace ARUI::Render {
 namespace {
 
 struct RenderPassData {
+  std::vector<FillPathRenderObject> pathFills;
+  std::vector<StrokePathRenderObject> pathStrokes;
   RendererConfiguration configuration;
   std::vector<SurfaceRenderObject> surfaces;
   std::vector<ShapeRenderObject> shapes;
@@ -22,6 +28,18 @@ struct RenderPassData {
   std::vector<MeshRenderObject> meshes;
   IRenderDevice *expectedDevice{};
 };
+
+struct TextVertex {
+  glm::vec3 position;
+  glm::vec2 uv;
+};
+
+glm::vec3 TransformPosition(const glm::mat4 &transform, glm::vec3 point) {
+  const glm::vec4 homogeneous = transform * glm::vec4{point, 1.0F};
+  if (std::abs(homogeneous.w) < 1.0e-6F)
+    return glm::vec3{homogeneous};
+  return glm::vec3{homogeneous} / homogeneous.w;
+}
 
 struct GeometryBatch {
   std::vector<glm::vec3> vertices;
@@ -35,7 +53,7 @@ void AppendMesh(GeometryBatch &batch, const MeshGeometry &mesh,
 
   const auto baseVertex = static_cast<uint32_t>(batch.vertices.size());
   for (const auto &position : mesh.positions)
-    batch.vertices.emplace_back(transform * glm::vec4(position, 1.0F));
+    batch.vertices.emplace_back(TransformPosition(transform, position));
 
   if (mesh.indices.empty()) {
     for (uint32_t i = 0; i < mesh.positions.size(); ++i)
@@ -50,6 +68,32 @@ void AppendMesh(GeometryBatch &batch, const MeshGeometry &mesh,
   }
 }
 
+void AppendFilledPath(GeometryBatch &batch,
+                      const FillPathRenderObject &object) {
+  if (!std::holds_alternative<SolidFill>(object.style.fill))
+    return;
+  std::vector<glm::vec3> polygon;
+  for (const auto &command : object.path.commands) {
+    if (const auto *move = std::get_if<MoveTo>(&command))
+      polygon.emplace_back(move->point, 0.0F);
+    else if (const auto *line = std::get_if<LineTo>(&command))
+      polygon.emplace_back(line->point, 0.0F);
+    else if (!std::holds_alternative<ClosePath>(command))
+      return; // Curved-path tessellation policy belongs here, not in painters.
+  }
+  if (polygon.size() < 3 || !object.path.IsClosed())
+    return;
+  const auto base = static_cast<uint32_t>(batch.vertices.size());
+  for (const auto &point : polygon)
+    batch.vertices.emplace_back(
+        TransformPosition(object.transform.localToWorld, point));
+  for (uint32_t i = 1; i + 1 < polygon.size(); ++i) {
+    batch.indices.push_back(base);
+    batch.indices.push_back(base + i);
+    batch.indices.push_back(base + i + 1);
+  }
+}
+
 void AppendRectangle(GeometryBatch &batch, const RectangleShape &rectangle,
                      const glm::mat4 &transform) {
   const auto baseVertex = static_cast<uint32_t>(batch.vertices.size());
@@ -59,7 +103,7 @@ void AppendRectangle(GeometryBatch &batch, const RectangleShape &rectangle,
                                    glm::vec3{halfSize.x, -halfSize.y, z},
                                    glm::vec3{halfSize.x, halfSize.y, z},
                                    glm::vec3{-halfSize.x, halfSize.y, z}})
-    batch.vertices.emplace_back(transform * glm::vec4(position, 1.0F));
+    batch.vertices.emplace_back(TransformPosition(transform, position));
   for (const uint32_t index : {0U, 1U, 2U, 2U, 3U, 0U})
     batch.indices.push_back(baseVertex + index);
 }
@@ -67,11 +111,16 @@ void AppendRectangle(GeometryBatch &batch, const RectangleShape &rectangle,
 } // namespace
 
 Renderer::Renderer(IRenderDevice &device, RendererConfiguration configuration)
-    : device_(device), configuration_(configuration) {}
+    : device_(device), configuration_(configuration) {
+  if (configuration_.fontFile.empty())
+    configuration_.fontFile = DefaultFontFile();
+}
 
 void Renderer::BeginFrame() {
   if (frameActive_)
     throw std::logic_error("renderer frame is already active");
+  pathFills_.clear();
+  pathStrokes_.clear();
   surfaces_.clear();
   shapes_.clear();
   curves_.clear();
@@ -84,6 +133,16 @@ void Renderer::BeginFrame() {
 void Renderer::RequireSubmissionOpen() const {
   if (!frameActive_ || graphBuilt_)
     throw std::logic_error("render submissions require an open, unbuilt frame");
+}
+
+void Renderer::FillPath(const FillPathRenderObject &path) {
+  RequireSubmissionOpen();
+  pathFills_.push_back(path);
+}
+
+void Renderer::StrokePath(const StrokePathRenderObject &path) {
+  RequireSubmissionOpen();
+  pathStrokes_.push_back(path);
 }
 
 void Renderer::Submit(const SurfaceRenderObject &surface) {
@@ -114,7 +173,9 @@ void Renderer::Submit(const MeshRenderObject &mesh) {
 void Renderer::BuildRenderGraph(RenderGraph &graph) {
   RequireSubmissionOpen();
 
-  RenderPassData submitted{.configuration = configuration_,
+  RenderPassData submitted{.pathFills = pathFills_,
+                           .pathStrokes = pathStrokes_,
+                           .configuration = configuration_,
                            .surfaces = surfaces_,
                            .shapes = shapes_,
                            .curves = curves_,
@@ -140,6 +201,8 @@ void Renderer::BuildRenderGraph(RenderGraph &graph) {
           commands->BindPipeline(data.configuration.pipeline);
 
         GeometryBatch batch;
+        for (const auto &path : data.pathFills)
+          AppendFilledPath(batch, path);
         for (const auto &surface : data.surfaces) {
           if (const auto *mesh = std::get_if<MeshSurface>(&surface.geometry))
             AppendMesh(batch, mesh->mesh, surface.transform.localToWorld);
@@ -171,8 +234,58 @@ void Renderer::BuildRenderGraph(RenderGraph &graph) {
           commands->DrawIndexed(static_cast<uint32_t>(batch.indices.size()));
         }
 
+        std::vector<BufferHandle> textBuffers;
+        std::vector<ImageHandle> textImages;
+        if (data.configuration.textPipeline.value != 0 && !data.text.empty()) {
+          commands->BindPipeline(data.configuration.textPipeline);
+          for (const auto &text : data.text) {
+            const auto bitmap =
+                RasterizeText(text.text, data.configuration.fontFile);
+            if (bitmap.Empty())
+              continue;
+            const float pixelsPerUnit = std::max(text.pixelsPerUnit, 1.0e-6F);
+            const float bitmapScale = std::max(text.fontSizePixels, 0.0F) /
+                                      static_cast<float>(GlyphPixelHeight);
+            const float width =
+                static_cast<float>(bitmap.width) * bitmapScale / pixelsPerUnit;
+            const float height =
+                static_cast<float>(bitmap.height) * bitmapScale / pixelsPerUnit;
+            const auto transformed = [&](float x, float y) {
+              return TransformPosition(text.transform.localToWorld,
+                                       {x, y, 0.0F});
+            };
+            const std::array<TextVertex, 6> vertices{{
+                {transformed(0.0F, -height), {0.0F, 1.0F}},
+                {transformed(width, -height), {1.0F, 1.0F}},
+                {transformed(width, 0.0F), {1.0F, 0.0F}},
+                {transformed(width, 0.0F), {1.0F, 0.0F}},
+                {transformed(0.0F, 0.0F), {0.0F, 0.0F}},
+                {transformed(0.0F, -height), {0.0F, 1.0F}},
+            }};
+            const auto vertexBytes = std::as_bytes(std::span{vertices});
+            const auto vertexBuffer = device->CreateBuffer(
+                {.size = static_cast<uint32_t>(vertexBytes.size()),
+                 .usage =
+                     static_cast<BufferUsage>(BufferUsageFlags::VertexBuffer),
+                 .initialData = vertexBytes});
+            const auto image = device->CreateImage(
+                {.extent = {bitmap.width, bitmap.height, 1},
+                 .format = ImageFormat::R8_UNORM,
+                 .usage = static_cast<ImageUsage>(ImageUsageFlags::Sampled),
+                 .initialData = std::span<const std::byte>{bitmap.pixels}});
+            textBuffers.push_back(vertexBuffer);
+            textImages.push_back(image);
+            commands->BindVertexBuffer(vertexBuffer, sizeof(TextVertex));
+            commands->BindTexture(0, image);
+            commands->Draw(PrimitiveTopology::Triangles, 6, 0);
+          }
+        }
         commands->EndRendering();
         device->Submit(*commands);
+        for (const auto image : textImages)
+          device->Destroy(image);
+        for (const auto buffer : textBuffers)
+          device->Destroy(buffer);
         if (!batch.indices.empty()) {
           device->Destroy(indexBuffer);
           device->Destroy(vertexBuffer);
@@ -188,7 +301,9 @@ void Renderer::EndFrame() {
 }
 
 RendererSubmissionCounts Renderer::SubmissionCounts() const noexcept {
-  return {.surfaces = surfaces_.size(),
+  return {.pathFills = pathFills_.size(),
+          .pathStrokes = pathStrokes_.size(),
+          .surfaces = surfaces_.size(),
           .shapes = shapes_.size(),
           .curves = curves_.size(),
           .text = text_.size(),

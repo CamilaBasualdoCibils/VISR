@@ -76,6 +76,7 @@ public:
   struct GLPipeline {
     GLuint programId;
     GLuint vaoId;
+    bool blending{};
   };
 
   GLTexture GetGLTexture(ImageHandle handle) const {

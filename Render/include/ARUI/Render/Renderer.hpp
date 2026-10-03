@@ -4,6 +4,7 @@
 #include "ARUI/Render/RenderCommons.hpp"
 
 #include <cstddef>
+#include <filesystem>
 #include <vector>
 
 namespace ARUI::Render {
@@ -12,10 +13,14 @@ class IRenderDevice;
 
 struct RendererConfiguration {
   GraphicsPipelineHandle pipeline;
+  GraphicsPipelineHandle textPipeline;
+  std::filesystem::path fontFile;
   RenderPassDesc renderPass;
 };
 
 struct RendererSubmissionCounts {
+  std::size_t pathFills{};
+  std::size_t pathStrokes{};
   std::size_t surfaces{};
   std::size_t shapes{};
   std::size_t curves{};
@@ -28,6 +33,8 @@ public:
   Renderer(IRenderDevice &device, RendererConfiguration configuration);
 
   void BeginFrame() override;
+  void FillPath(const FillPathRenderObject &path) override;
+  void StrokePath(const StrokePathRenderObject &path) override;
   void Submit(const SurfaceRenderObject &surface) override;
   void Submit(const ShapeRenderObject &shape) override;
   void Submit(const CurveRenderObject &curve) override;
@@ -42,6 +49,8 @@ private:
   void RequireSubmissionOpen() const;
 
   IRenderDevice &device_;
+  std::vector<FillPathRenderObject> pathFills_;
+  std::vector<StrokePathRenderObject> pathStrokes_;
   RendererConfiguration configuration_;
   std::vector<SurfaceRenderObject> surfaces_;
   std::vector<ShapeRenderObject> shapes_;

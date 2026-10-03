@@ -31,8 +31,7 @@ public:
   }
 
   void BindTexture(uint32_t slot, ImageHandle handle) override {
-    // TODO: Implement this pure virtual method.
-    assert(false && "Method `BindTexture` is not implemented.");
+    commandQueue.push_back(BindTextureCommand{slot, handle});
   }
 
   void Draw(PrimitiveTopology topology, uint32_t vertexCount,
@@ -76,6 +75,11 @@ private:
     BufferHandle handle;
     void Execute(OpenGLRenderDevice *renderDevice);
   };
+  struct BindTextureCommand {
+    uint32_t slot;
+    ImageHandle handle;
+    void Execute(OpenGLRenderDevice *renderDevice);
+  };
   struct DrawCommand {
     PrimitiveTopology topology;
     uint32_t vertexCount;
@@ -90,7 +94,7 @@ private:
   };
   using Command = std::variant<BeginRenderCommand, EndRenderCommand,
                                BindPipelineCommand, BindVertexBufferCommand,
-                               BindIndexBufferCommand, DrawCommand,
+                               BindIndexBufferCommand, BindTextureCommand, DrawCommand,
                                DrawIndexedCommand>;
   std::vector<Command> commandQueue;
 

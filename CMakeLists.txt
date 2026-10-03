@@ -13,7 +13,7 @@ include(cmake/CompileShaders.cmake)
 enable_testing()
 add_spirv_shader_library(
     TARGET ARUI_OpenGLShaders
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/Server/res/Shaders/OpenGL"
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/Render/res/Shaders/OpenGL"
     TARGET_ENV opengl
     NAMESPACE ARUI::Shaders::OpenGL
 )

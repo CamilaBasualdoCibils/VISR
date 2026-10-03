@@ -5,7 +5,7 @@
 
 namespace ARUI::Tools::Simulator {
 namespace {
-constexpr glm::ivec2 viewportSize{800, 600};
+constexpr glm::ivec2 viewportSize{1832, 1920};
 constexpr float eyeOffset = 0.032F;
 
 RenderView MakeView(std::string name, const Pose &pose) {

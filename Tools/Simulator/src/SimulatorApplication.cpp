@@ -2,7 +2,8 @@
 
 #include "ARUI/Render/RenderGraph.hpp"
 #include "ARUI/Render/Renderer.hpp"
-#include "ShaderRegistry.hpp"
+#include "ARUI/Render/RuntimePainter.hpp"
+#include "ARUI/Render/StandardPipeline.hpp"
 
 #include <algorithm>
 #include <array>
@@ -221,86 +222,37 @@ void SubmitTrackedBody(Render::Renderer &renderer, const RenderView &view,
   }
 }
 
-void SubmitRuntimeTree(Render::Renderer &renderer,
-                       const Runtime::RuntimeTree &runtime,
-                       const RenderView &view, SimulatorXRTracker &tracker) {
-  for (const Runtime::NodeID rootID : runtime.RootChildren()) {
-    const Runtime::RNode *surface = runtime.Get(rootID);
-    if (!surface || !surface->visible ||
-        surface->type != Language::LNodeType::Surface ||
-        surface->surfaceType != Language::SurfaceType::Plane)
-      continue;
+Render::SurfacePaintView MakeSurfaceView(
+    const Runtime::RNode &surface, const RenderView &view,
+    SimulatorXRTracker &tracker, glm::uvec2 extent) {
+  const float x = Meters(surface.style.xOffset, 0.0F);
+  const float y = Meters(surface.style.yOffset, 0.0F);
+  const float z = Meters(surface.style.zOffset, -2.0F);
+  const auto anchorAttribute = surface.attributes.find("anchor");
+  const auto *anchorName = anchorAttribute == surface.attributes.end()
+      ? nullptr : std::get_if<std::string>(&anchorAttribute->second);
+  Pose anchor;
+  if (anchorName && *anchorName != "world")
+    if (const auto tracked = tracker.GetPose(*anchorName)) anchor = tracked->pose;
+  const glm::vec3 center =
+      anchor.position + anchor.orientation * glm::vec3{x, y, z};
+  const glm::quat orientation = glm::normalize(
+      anchor.orientation * glm::quat(glm::vec3{
+          Radians(surface.style.xRotation), Radians(surface.style.yRotation),
+          Radians(surface.style.zRotation)}));
+  const glm::mat4 model = glm::translate(glm::mat4{1.0F}, center) *
+                          glm::mat4_cast(orientation);
+  const glm::mat4 localToClip = view.projection * view.view * model;
 
-    const float x = Meters(surface->style.xOffset, 0.0F);
-    const float y = Meters(surface->style.yOffset, 0.0F);
-    const float z = Meters(surface->style.zOffset, -2.0F);
-    const auto anchorAttribute = surface->attributes.find("anchor");
-    const auto *anchorName =
-        anchorAttribute == surface->attributes.end()
-            ? nullptr
-            : std::get_if<std::string>(&anchorAttribute->second);
-    Pose anchor;
-    if (anchorName && *anchorName != "world") {
-      if (const auto trackedPose = tracker.GetPose(*anchorName))
-        anchor = trackedPose->pose;
-    }
-    const glm::vec3 center =
-        anchor.position + anchor.orientation * glm::vec3{x, y, z};
-    Pose surfacePose = anchor;
-    surfacePose.orientation = glm::normalize(
-        anchor.orientation * glm::quat(glm::vec3{
-            Radians(surface->style.xRotation),
-            Radians(surface->style.yRotation),
-            Radians(surface->style.zRotation)}));
-    const glm::vec3 right = surfacePose.Right();
-    const glm::vec3 up = surfacePose.Up();
-    const glm::vec3 towardViewer = -surfacePose.Forward();
-    const float width = Meters(surface->style.width, 1.2F);
-    const float height = Meters(surface->style.height, 0.7F);
-    const float surfacePadding =
-        InsetMeters(surface->style.padding, width);
-
-    constexpr float border = 0.018F;
-    renderer.Submit(
-        MakeQuad(view, center + up * height * 0.5F, right, up, width, border));
-    renderer.Submit(
-        MakeQuad(view, center - up * height * 0.5F, right, up, width, border));
-    renderer.Submit(MakeQuad(view, center - right * width * 0.5F, right, up,
-                             border, height));
-    renderer.Submit(MakeQuad(view, center + right * width * 0.5F, right, up,
-                             border, height));
-
-    for (const Runtime::NodeID panelID : surface->children) {
-      const Runtime::RNode *panel = runtime.Get(panelID);
-      if (!panel || !panel->visible)
-        continue;
-      const float panelMargin =
-          InsetMeters(panel->style.margin, width);
-      const float panelWidth = Meters(
-          panel->style.width,
-          std::max(0.05F, width - 2.0F * (surfacePadding + panelMargin)));
-      const float panelHeight = Meters(
-          panel->style.height,
-          std::max(0.05F, height - 2.0F * (surfacePadding + panelMargin)));
-      const glm::vec3 panelCenter = center + towardViewer * 0.01F;
-      renderer.Submit(
-          MakeQuad(view, panelCenter, right, up, panelWidth, panelHeight));
-
-      const float panelPadding =
-          InsetMeters(panel->style.padding, panelWidth);
-      for (const Runtime::NodeID childID : panel->children) {
-        const Runtime::RNode *child = runtime.Get(childID);
-        if (child && child->visible &&
-            child->type == Language::LNodeType::Text) {
-          const float textWidth = Meters(
-              child->style.width,
-              std::max(0.02F, panelWidth - 2.0F * panelPadding));
-          renderer.Submit(MakeQuad(view, panelCenter + towardViewer * 0.01F,
-                                   right, up, textWidth, 0.025F));
-        }
-      }
-    }
-  }
+  const auto project = [&](glm::vec3 local) {
+    const glm::vec4 clip = localToClip * glm::vec4{local, 1.0F};
+    return glm::vec2{clip} / clip.w;
+  };
+  constexpr float sampleMeters = 0.01F;
+  const float pixelsPerMeter = std::max(1.0F,
+      glm::length(project({0.0F, sampleMeters, 0.0F}) - project({0.0F, 0.0F, 0.0F})) *
+      static_cast<float>(extent.y) * 0.5F / sampleMeters);
+  return {.localToClip = localToClip, .pixelsPerMeter = pixelsPerMeter};
 }
 
 } // namespace
@@ -315,7 +267,7 @@ SimulatorApplication::SimulatorApplication()
 }
 
 int SimulatorApplication::Run() {
-  constexpr glm::uvec2 extent{800, 600};
+  constexpr glm::uvec2 extent{1832, 1920};
   const std::array<glm::uvec2, 3> imageExtents = {
       extent, glm::uvec2{tracker_->GetEyeExtent(0)},
       glm::uvec2{tracker_->GetEyeExtent(1)}};
@@ -333,25 +285,9 @@ int SimulatorApplication::Run() {
         {.image = images[i], .format = Render::ImageFormat::R8G8B8A8_UNORM});
   }
 
-  // Temporary pipeline for runtime debug geometry. Real runtime rendering will
-  // replace this when layout and material resolution are connected.
-  const auto &vertexShader = ARUI::Shaders::OpenGL::GetShader("test.vert");
-  const auto &fragmentShader = ARUI::Shaders::OpenGL::GetShader("test.frag");
-  const auto vertexModule = renderDevice_->CreateShaderModule(
-      {.stage = Render::ShaderStageFlags::Vertex,
-       .spirv = std::as_bytes(vertexShader.spirv)});
-  const auto fragmentModule = renderDevice_->CreateShaderModule(
-      {.stage = Render::ShaderStageFlags::Fragment,
-       .spirv = std::as_bytes(fragmentShader.spirv)});
-  const auto pipeline = renderDevice_->CreatePipeline(
-      {.vertexShader = vertexModule,
-       .fragmentShader = fragmentModule,
-       .vertexLayout =
-           {.bindings = {{.binding = 0, .stride = sizeof(glm::vec3)}},
-            .attributes = {{.location = 0,
-                            .binding = 0,
-                            .format = Render::VertexFormat::Float3}}},
-       .colorFormats = {Render::ImageFormat::R8G8B8A8_UNORM}});
+  Render::StandardPipeline standardPipeline{*renderDevice_};
+  Render::PainterRegistry painters;
+  Render::RegisterDefaultPainter(painters);
   using Clock = std::chrono::steady_clock;
   const auto framePeriod = std::chrono::duration_cast<Clock::duration>(
       std::chrono::duration<double>{1.0 / 90.0});
@@ -375,18 +311,25 @@ int SimulatorApplication::Run() {
     const auto frameViews = views_->GetViews();
     for (std::size_t i = 0; i < frameViews.size(); ++i) {
       Render::Renderer renderer(
-          *renderDevice_, {.pipeline = pipeline,
-                           .renderPass = {.colorAttachment = imageViews[i],
+          *renderDevice_, standardPipeline.Configuration({.colorAttachment = imageViews[i],
                                           .clearColor = true,
                                           .clearColorValue =
                                               i != 0 && tracker_->IsPassthroughEnabled()
                                                   ? glm::vec4{0.0F}
                                                   : glm::vec4{0.08F, 0.09F, 0.12F, 1.0F},
                                           .extent = imageExtents[i],
-                                          .offset = {0, 0}}});
+                                          .offset = {0, 0}}));
       Render::RenderGraph graph;
       renderer.BeginFrame();
-      SubmitRuntimeTree(renderer, runtimeTree_, frameViews[i], *tracker_);
+      Render::PaintContext paintContext{renderer};
+      for (const Runtime::NodeID root : runtimeTree_.RootChildren()) {
+        const auto *surface = runtimeTree_.Get(root);
+        if (!surface || surface->surfaceType != Language::SurfaceType::Plane)
+          continue;
+        Render::PaintRuntimeSurface(
+            paintContext, painters, runtimeTree_, root,
+            MakeSurfaceView(*surface, frameViews[i], *tracker_, imageExtents[i]));
+      }
       if (tracker_->DrawSkeletons()) {
         SubmitTrackedHands(renderer, frameViews[i], *tracker_);
         SubmitTrackedBody(renderer, frameViews[i], *tracker_);
@@ -411,9 +354,6 @@ int SimulatorApplication::Run() {
       nextFrame = now;
   }
 
-  renderDevice_->Destroy(pipeline);
-  renderDevice_->Destroy(fragmentModule);
-  renderDevice_->Destroy(vertexModule);
   for (std::size_t i = 0; i < images.size(); ++i) {
     renderDevice_->Destroy(imageViews[i]);
     renderDevice_->Destroy(images[i]);

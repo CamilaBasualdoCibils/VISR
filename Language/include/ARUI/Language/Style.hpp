@@ -15,7 +15,11 @@ namespace ARUI::Language {
 
 
 struct LayoutParameters {
+  Length margin{0.0, LengthUnit::Millimeter};
+  Length padding{0.0, LengthUnit::Millimeter};
+  Length gap{0.0, LengthUnit::Millimeter};
   Length fontSize{5.0, LengthUnit::Millimeter};
+  std::string_view fontFamily{"Noto Sans"};
 };
 
 inline constexpr LayoutParameters DefaultLayoutParameters{};
@@ -36,6 +40,7 @@ struct PainterStylePropertyDescriptor {
   std::string name;
   PainterStyleType type{};
   bool inherited{};
+  bool acceptsNone{};
 };
 
 struct PainterStyleSchema {

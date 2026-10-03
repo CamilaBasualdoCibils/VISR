@@ -128,6 +128,23 @@ ARUI::Render::OpenGLRenderDevice::CreateImage(const ImageDesc &desc) {
     assert(glFormat.has_value());
     glTextureStorage2D(glTexture.id, 1, glFormat.value(), desc.extent.x,
                        desc.extent.y);
+    glTextureParameteri(glTexture.id, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(glTexture.id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(glTexture.id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(glTexture.id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    if (!desc.initialData.empty()) {
+      const bool singleChannel = desc.format == ImageFormat::R8_UNORM;
+      const std::size_t bytesPerPixel = singleChannel ? 1U : 4U;
+      const std::size_t expected = static_cast<std::size_t>(desc.extent.x) *
+                                   desc.extent.y * bytesPerPixel;
+      if (desc.initialData.size_bytes() < expected)
+        throw std::invalid_argument("initial image data is too small");
+      glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+      glTextureSubImage2D(glTexture.id, 0, 0, 0, desc.extent.x,
+                          desc.extent.y, singleChannel ? GL_RED : GL_RGBA,
+                          GL_UNSIGNED_BYTE, desc.initialData.data());
+      glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    }
     ImageHandle handle = GenerateTextureHandle();
     textures[handle] = glTexture;
     return handle;
@@ -207,6 +224,8 @@ ARUI::Render::OpenGLRenderDevice::CreatePipeline(
   GLPipeline glPipeline{
       .programId = program,
       .vaoId = vao,
+      .blending = !graphicsDesc.blend.attachments.empty() &&
+                  graphicsDesc.blend.attachments.front().enabled,
   };
   pipelines[handle] = glPipeline;
   return handle;

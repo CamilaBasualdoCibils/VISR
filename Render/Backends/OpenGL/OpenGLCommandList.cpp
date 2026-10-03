@@ -50,6 +50,12 @@ void ARUI::Render::OpenGLCommandList::BindPipelineCommand::Execute(
     OpenGLRenderDevice *renderDevice) {
   glBindVertexArray(renderDevice->GetGLPipeline(handle).vaoId);
   glUseProgram(renderDevice->GetGLPipeline(handle).programId);
+  if (renderDevice->GetGLPipeline(handle).blending) {
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  } else {
+    glDisable(GL_BLEND);
+  }
 }
 
 void ARUI::Render::OpenGLCommandList::BindVertexBufferCommand::Execute(
@@ -60,6 +66,11 @@ void ARUI::Render::OpenGLCommandList::BindVertexBufferCommand::Execute(
 void ARUI::Render::OpenGLCommandList::BindIndexBufferCommand::Execute(
     OpenGLRenderDevice *renderDevice) {
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderDevice->GetGLBuffer(handle).id);
+}
+
+void ARUI::Render::OpenGLCommandList::BindTextureCommand::Execute(
+    OpenGLRenderDevice *renderDevice) {
+  glBindTextureUnit(slot, renderDevice->GetGLTexture(handle).id);
 }
 
 void ARUI::Render::OpenGLCommandList::DrawCommand::Execute(

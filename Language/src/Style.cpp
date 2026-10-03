@@ -16,7 +16,11 @@ PainterStyleSchema::Find(std::string_view name) const noexcept {
 bool PainterStyleSchema::Accepts(std::string_view name,
                                  const PainterStyleValue &value) const noexcept {
   const auto *property = Find(name);
-  return property != nullptr && property->type == TypeOf(value);
+  if (property == nullptr) return false;
+  if (property->acceptsNone)
+    if (const auto *text = std::get_if<std::string>(&value))
+      return *text == "none";
+  return property->type == TypeOf(value);
 }
 
 PainterStyleType TypeOf(const PainterStyleValue &value) noexcept {
