@@ -1,6 +1,7 @@
 #include "ARUI/Render/Font.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include <memory>
@@ -50,6 +51,9 @@ std::vector<FT_ULong> DecodeUtf8(std::string_view text) {
 } // namespace
 
 std::filesystem::path DefaultFontFile() {
+  if (const char *configured = std::getenv("ARUI_FONT_PATH");
+      configured && *configured)
+    return std::filesystem::path{configured};
   return std::filesystem::path{ARUI_DEFAULT_FONT_PATH};
 }
 

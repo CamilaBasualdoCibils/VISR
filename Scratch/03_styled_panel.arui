@@ -9,7 +9,7 @@
 
         align-self: center;
 
-        painter: glass;
+        painter: default;
     }
 
     .title {
@@ -30,7 +30,7 @@
 
         padding: 5mm;
 
-        painter: glass;
+        painter: default;
     }
     </style>
 

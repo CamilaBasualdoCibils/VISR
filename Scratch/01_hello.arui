@@ -1,5 +1,5 @@
 <arui>
-    <surface width="20cm" height="10cm">
+    <surface width="20cm" height="10cm", anchor = "head">
         <text>Hello, ARUI!</text>
     </surface>
 </arui>
