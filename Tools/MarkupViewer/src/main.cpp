@@ -3,7 +3,7 @@
 #include "ARUI/Render/RenderGraph.hpp"
 #include "ARUI/Render/Renderer.hpp"
 #include "ARUI/Render/StandardPipeline.hpp"
-#include "ARUI/Runtime/Painter.hpp"
+#include "ARUI/Runtime/IPainter.hpp"
 #include "ARUI/Runtime/RuntimePainter.hpp"
 #include "ARUI/Runtime/RuntimeTree.hpp"
 
@@ -77,7 +77,7 @@ public:
     style.WindowRounding = 0.0F;
     style.ChildRounding = 0.0F;
     style.FrameRounding = 3.0F;
-    ARUI::Runtime::RegisterFlatPainter(painters_);
+
     CreateRenderResources();
     if (initialPath.empty())
       ParseAndSubmit();
@@ -243,28 +243,40 @@ private:
     renderer.BeginFrame();
     ARUI::Runtime::PaintContext paintContext{renderer};
     for (const NodeID root : runtime_.RootChildren()) {
+      /*  const auto *surface = runtime_.Get(root);
+       const float surfaceWidth =
+           surface ? surface->style.width.As(ARUI::Language::LengthUnit::Meter)
+                         .Value()
+                   : 0.0F;
+       const float surfaceHeight =
+           surface ? surface->style.height.As(ARUI::Language::LengthUnit::Meter)
+                         .Value()
+                   : 0.0F;
+       if (surfaceWidth <= 0.0F || surfaceHeight <= 0.0F)
+         continue;
+       const float pixelsPerMeter =
+           std::min(static_cast<float>(RenderExtent.x) / surfaceWidth,
+                    static_cast<float>(RenderExtent.y) / surfaceHeight);
+       const glm::vec2 metersToNdc{
+           2.0F * pixelsPerMeter / static_cast<float>(RenderExtent.x),
+           2.0F * pixelsPerMeter / static_cast<float>(RenderExtent.y)};
+       const glm::mat4 localToClip =
+           glm::scale(glm::mat4{1.0F}, {metersToNdc.x, metersToNdc.y, 1.0F});
+       ARUI::Runtime::PaintRuntimeSurface(
+           paintContext, painters_, runtime_, root,
+           {.localToClip = localToClip, .pixelsPerMeter = pixelsPerMeter}); */
       const auto *surface = runtime_.Get(root);
-      const float surfaceWidth =
+      const glm::vec2 surfaceSizeMeter{
           surface ? surface->style.width.As(ARUI::Language::LengthUnit::Meter)
                         .Value()
-                  : 0.0F;
-      const float surfaceHeight =
+                  : 0.0F,
           surface ? surface->style.height.As(ARUI::Language::LengthUnit::Meter)
                         .Value()
-                  : 0.0F;
-      if (surfaceWidth <= 0.0F || surfaceHeight <= 0.0F)
+                  : 0.0F};
+      if (glm::any(glm::lessThanEqual(surfaceSizeMeter, glm::vec2{0.0F})))
         continue;
-      const float pixelsPerMeter =
-          std::min(static_cast<float>(RenderExtent.x) / surfaceWidth,
-                   static_cast<float>(RenderExtent.y) / surfaceHeight);
-      const glm::vec2 metersToNdc{
-          2.0F * pixelsPerMeter / static_cast<float>(RenderExtent.x),
-          2.0F * pixelsPerMeter / static_cast<float>(RenderExtent.y)};
-      const glm::mat4 localToClip =
-          glm::scale(glm::mat4{1.0F}, {metersToNdc.x, metersToNdc.y, 1.0F});
-      ARUI::Runtime::PaintRuntimeSurface(
-          paintContext, painters_, runtime_, root,
-          {.localToClip = localToClip, .pixelsPerMeter = pixelsPerMeter});
+        
+
     }
     renderer.BuildRenderGraph(graph);
     graph.Compile();

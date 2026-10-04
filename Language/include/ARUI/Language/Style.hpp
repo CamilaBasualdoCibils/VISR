@@ -88,11 +88,7 @@ struct Style {
   PainterStyleProperties painterProperties;
 };
 
-[[nodiscard]] constexpr Length
-ResolveFontSize(const Style &style,
-                Length inherited = DefaultLayoutParameters.fontSize) noexcept {
-  return style.fontSize.value_or(inherited);
-}
+
 
 [[nodiscard]] PainterStyleType TypeOf(const PainterStyleValue &value) noexcept;
 

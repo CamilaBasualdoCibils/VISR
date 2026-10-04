@@ -307,7 +307,6 @@ int SimulatorApplication::Run() {
 
   Render::StandardPipeline standardPipeline{*renderDevice_};
   Runtime::PainterRegistry painters;
-  Runtime::RegisterFlatPainter(painters);
   using Clock = std::chrono::steady_clock;
   const auto framePeriod = std::chrono::duration_cast<Clock::duration>(
       std::chrono::duration<double>{1.0 / 90.0});

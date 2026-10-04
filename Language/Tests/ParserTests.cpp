@@ -104,6 +104,81 @@ TEST(Parser, RejectsMissingSurfaceWidthAndHeight) {
             std::string::npos);
 }
 
+TEST(Parser, AcceptsDeclaredAttributesAndAssignsTypedValues) {
+  const auto parsed = ParseMarkup(R"(<arui>
+    <script type="module">export {};</script>
+    <surface width="1m" height="25cm" anchor="desk" class="root" behavior="open">
+      <group name="tools" class="layout" behavior="groupBehavior">
+        <row class="horizontal" behavior="rowBehavior"/>
+        <column class="vertical" behavior="columnBehavior"/>
+        <stack class="layers" behavior="stackBehavior"/>
+        <panel name="details" class="card" behavior="panelBehavior"/>
+        <text state="system.cpu" class="value" behavior="textBehavior"/>
+        <image src="meter.png" alt="meter" class="icon" behavior="imageBehavior"/>
+      </group>
+    </surface>
+  </arui>)");
+  ASSERT_TRUE(parsed) << parsed.diagnostics.front().message;
+  const auto &surface = OnlySurface(parsed);
+  EXPECT_EQ(*surface.GetAttribute<std::string>("anchor"), "desk");
+  EXPECT_EQ(surface.style.width, (Length{1, LengthUnit::Meter}));
+  EXPECT_EQ(surface.style.height, (Length{25, LengthUnit::Centimeter}));
+  const auto &group = surface.children.at(0);
+  EXPECT_EQ(*group.GetAttribute<std::string>("name"), "tools");
+  ASSERT_EQ(group.children.size(), 6u);
+  EXPECT_EQ(group.children[4].GetAttribute<StateReference>("state")->value,
+            "system.cpu");
+  EXPECT_EQ(*group.children[5].GetAttribute<std::string>("src"), "meter.png");
+  EXPECT_EQ(parsed.value.scripts.at(0).type, "module");
+}
+
+TEST(Parser, RejectsUnknownAttributesFromElementSchemas) {
+  for (const auto markup : {
+           "<arui><surface width='1m' height='1m' bogus='x'/></arui>",
+           "<arui><surface width='1m' height='1m'><text "
+           "name='x'/></surface></arui>",
+           "<arui><script language='js'/></arui>",
+       }) {
+    const auto parsed = ParseMarkup(markup);
+    EXPECT_FALSE(parsed);
+    ASSERT_FALSE(parsed.diagnostics.empty());
+    EXPECT_NE(parsed.diagnostics[0].message.find("invalid attribute"),
+              std::string::npos);
+  }
+}
+
+TEST(Parser, RejectsMalformedPhysicalLengths) {
+  for (const auto value : {"wide", "0cm", "-1m", "1%"}) {
+    const auto parsed =
+        ParseMarkup("<arui><surface width='" + std::string(value) +
+                    "' height='1m'/></arui>");
+    EXPECT_FALSE(parsed);
+    ASSERT_FALSE(parsed.diagnostics.empty());
+    EXPECT_NE(parsed.diagnostics[0].message.find("invalid <surface> width"),
+              std::string::npos);
+  }
+}
+
+TEST(Parser, EnforcesStyleAndScriptRestrictions) {
+  const auto styled = ParseMarkup(
+      "<arui><style type='text/css'>panel { gap: 1mm; }</style></arui>");
+  EXPECT_FALSE(styled);
+  ASSERT_FALSE(styled.diagnostics.empty());
+  EXPECT_EQ(styled.diagnostics[0].message,
+            "<style> does not accept attributes");
+
+  const auto nestedStyle = ParseMarkup("<arui><style><panel/></style></arui>");
+  EXPECT_FALSE(nestedStyle);
+  EXPECT_NE(nestedStyle.diagnostics[0].message.find("cannot contain markup"),
+            std::string::npos);
+
+  const auto nestedScript =
+      ParseMarkup("<arui><script><panel/></script></arui>");
+  EXPECT_FALSE(nestedScript);
+  EXPECT_NE(nestedScript.diagnostics[0].message.find("cannot contain markup"),
+            std::string::npos);
+}
+
 TEST(Parser, RejectsInvalidRootUnknownNodesAndTopLevelElements) {
   EXPECT_FALSE(ParseMarkup("<surface width=\"1m\" height=\"1m\"/>"));
   auto unknown = ParseMarkup(

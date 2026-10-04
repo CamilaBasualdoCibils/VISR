@@ -19,9 +19,12 @@ XR
 └── OpenXR
 Tools
 └── Simulator
+Presentation
+├── IPresentationController
+├── RPC client/server
+└── Runtime controller
 Server
-├── Manager
-└── Desktop
+└── Runtime
 ```
 
 ## Ownership
@@ -38,8 +41,12 @@ Server
   **XR/OpenXR** implements those contracts for an OpenXR runtime, including
   headless EGL presentation, stereo views, tracking, and environment sensing.
 - **Tools/Simulator** provides a development-only display and tracking backend.
-- **Server/Manager** coordinates runtime, rendering, and XR services.
-  **Server/Desktop** is the desktop executable and owns its platform window.
+- **Presentation** defines the privileged `IPresentationController`, its rpclib
+  client proxy and endpoint, and the runtime-backed implementation. It is not
+  part of the normal Application contract.
+- **Server/Runtime** is the long-lived ARUI composition root. It owns Runtime,
+  rendering, XR, and the presentation RPC service. Boot, Login, Desktop,
+  Managers, and OS presentation policy remain in AR-OS.
 
 The dependency direction is from integration layers toward contracts:
 

@@ -4,7 +4,7 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <string_view>
 namespace ARUI::Runtime {
-float LengthInMeters(Language::Length length, float fallback) noexcept {
+/* float LengthInMeters(Language::Length length, float fallback) noexcept {
   switch (length.unit) {
   case Language::LengthUnit::Millimeter:
     return static_cast<float>(length.value * 0.001);
@@ -18,8 +18,8 @@ float LengthInMeters(Language::Length length, float fallback) noexcept {
     return fallback;
   }
   return fallback;
-}
-
+} */
+/* 
 namespace {
 void PaintRuntimeNode(PaintContext &context, const PainterRegistry &painters,
                       const RuntimeTree &runtime, NodeID id, glm::vec2 minimum,
@@ -50,12 +50,8 @@ void PaintRuntimeNode(PaintContext &context, const PainterRegistry &painters,
                   .localToWorld = centerTransform,
                   .contentOriginToWorld = contentTransform,
                   .attributes = &node->attributes,
-                  .fontSizePixels = static_cast<float>(
-                      Language::ResolveFontSize(node->style, inheritedFontSize)
-                          .As(Language::LengthUnit::Meter)
-                          .Value() *
-                      view.pixelsPerMeter),
-                  .pixelsPerUnit = view.pixelsPerMeter,
+
+                  .fontSize =,
                   .fontFamily = Language::DefaultLayoutParameters.fontFamily},
                  node->style.painterProperties, context);
 
@@ -92,9 +88,9 @@ void PaintRuntimeNode(PaintContext &context, const PainterRegistry &painters,
                      depth + 0.0001F);
   }
 }
-} // namespace
+} // namespace */
 
-void PaintRuntimeSurface(PaintContext &context, const PainterRegistry &painters,
+/* void PaintRuntimeSurface(PaintContext &context, const PainterRegistry &painters,
                          const RuntimeTree &runtime, NodeID surfaceID,
                          const SurfacePaintView &view) {
   const auto *surface = runtime.Get(surfaceID);
@@ -111,5 +107,58 @@ void PaintRuntimeSurface(PaintContext &context, const PainterRegistry &painters,
                    {-width * 0.5F, -height * 0.5F},
                    {width * 0.5F, height * 0.5F}, view,
                    Language::DefaultLayoutParameters.fontSize, 0.0F);
+} */
+void PaintRuntimeSurface(
+    PaintContext& context,
+    const PainterRegistry& painters,
+    const RuntimeTree& runtime,
+    NodeID surfaceID,
+    const SurfacePaintView& view)
+{
+    const RNode* surface = runtime.Get(surfaceID);
+
+    if (!surface ||
+        !surface->visible ||
+        surface->type != Language::LNodeType::Surface)
+    {
+        return;
+    }
+
+    const std::string_view painterName =
+        surface->style.painter
+            ? surface->style.painter->name
+            : DefaultPainterName;
+
+    const IPainter* painter = painters.Find(painterName);
+
+    if (!painter)
+        painter = painters.Find(DefaultPainterName);
+
+    if (!painter)
+        return;
+
+    const glm::vec2 extent{
+        surface->style.width
+            .As(Language::LengthUnit::Meter)
+            .Value(),
+
+        surface->style.height
+            .As(Language::LengthUnit::Meter)
+            .Value()
+    };
+
+    if (extent.x <= 0.0f || extent.y <= 0.0f)
+        return;
+
+    painter->Paint(
+        PaintTreeContext{
+            .draw         = context,
+            .tree         = runtime,
+            .root         = surfaceID,
+            .localToWorld = view.localToClip,
+            .extent       = extent,
+        },
+        surface->style.painterProperties
+    );
 }
 } // namespace ARUI::Runtime

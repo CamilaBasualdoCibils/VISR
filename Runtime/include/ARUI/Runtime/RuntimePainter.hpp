@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ARUI/Runtime/Painter.hpp"
+#include "ARUI/Runtime/IPainter.hpp"
 #include "ARUI/Runtime/RuntimeTree.hpp"
 
 namespace ARUI::Runtime {

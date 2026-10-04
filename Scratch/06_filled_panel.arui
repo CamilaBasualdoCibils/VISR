@@ -5,7 +5,7 @@
         padding: 1cm;
     }
     </style>
-    <surface width="30cm" height="18cm" anchor="head" x-offset=10cm>
+    <surface width="30cm" height="18cm" anchor="right_hand">
         <panel class="red-panel">
             <text>Filled by arui-flat-painter</text>
         </panel>

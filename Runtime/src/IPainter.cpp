@@ -1,4 +1,4 @@
-#include "ARUI/Runtime/Painter.hpp"
+#include "ARUI/Runtime/IPainter.hpp"
 #include <stdexcept>
 #include <utility>
 
@@ -37,7 +37,7 @@ const IPainter *PainterRegistry::Find(std::string_view name) const noexcept {
   const auto found = painters_.find(std::string{name});
   return found == painters_.end() ? nullptr : found->second.get();
 }
-
+/* 
 const Language::PainterStyleSchema &FlatPainter::StyleSchema() const noexcept {
   return schema_;
 }
@@ -58,8 +58,7 @@ void FlatPainter::Paint(const PaintNode &node,
       return;
     context.DrawText(
         {.text = *textValue,
-         .fontSizePixels = node.fontSizePixels,
-         .pixelsPerUnit = node.pixelsPerUnit,
+         .fontSize = node.fontSize,
          .fontFamily = std::string{node.fontFamily},
          .transform = {.localToWorld = node.contentOriginToWorld}});
     return;
@@ -93,5 +92,5 @@ void RegisterFlatPainter(PainterRegistry &registry) {
   auto painter = std::make_shared<FlatPainter>();
   registry.Register(std::string{DefaultPainterName}, painter);
   registry.Register("default", std::move(painter));
-}
+} */
 } // namespace ARUI::Runtime

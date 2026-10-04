@@ -239,7 +239,7 @@ void Renderer::BuildRenderGraph(RenderGraph &graph) {
         if (data.configuration.textPipeline.value != 0 && !data.text.empty()) {
           commands->BindPipeline(data.configuration.textPipeline);
           for (const auto &text : data.text) {
-            const auto bitmap =
+            /* const auto bitmap =
                 RasterizeText(text.text, data.configuration.fontFile);
             if (bitmap.Empty())
               continue;
@@ -277,7 +277,7 @@ void Renderer::BuildRenderGraph(RenderGraph &graph) {
             textImages.push_back(image);
             commands->BindVertexBuffer(vertexBuffer, sizeof(TextVertex));
             commands->BindTexture(0, image);
-            commands->Draw(PrimitiveTopology::Triangles, 6, 0);
+            commands->Draw(PrimitiveTopology::Triangles, 6, 0); */
           }
         }
         commands->EndRendering();

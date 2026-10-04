@@ -1,10 +1,11 @@
-#include "AruiDesktop.hpp"
-#include "ARUI/Language/node.hpp"
+#include "AruiServer.hpp"
+#include "ARUI/Presentation/PresentationRpcServer.hpp"
+#include "ARUI/Presentation/RuntimePresentationController.hpp"
 #include "ARUI/Render/Backends/OpenGL/OpenGLOpenXRBinding.hpp"
 #include "ARUI/Render/Backends/OpenGL/OpenGLRenderDevice.hpp"
 #include "ARUI/Render/Renderer.hpp"
 #include "ARUI/Render/StandardPipeline.hpp"
-#include "ARUI/Runtime/Painter.hpp"
+#include "ARUI/Runtime/IPainter.hpp"
 #include "ARUI/Runtime/RuntimePainter.hpp"
 #include "ARUI/Runtime/RuntimeTree.hpp"
 #include "ARUI/XR/OpenXR/OpenXRPresenter.hpp"
@@ -16,6 +17,7 @@
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
+#include <mutex>
 #include <span>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -95,7 +97,7 @@ private:
 };
 } // namespace
 
-int ARUI::Server::Manager::AruiDesktop::Run() {
+int ARUI::Server::AruiServer::Run() {
   auto openGL = std::make_shared<Render::OpenGLRenderDevice>();
   auto graphics = std::make_shared<Render::OpenGLOpenXRBinding>(openGL);
   auto openXRPresenter = std::make_shared<OpenXR::OpenXRPresenter>(graphics);
@@ -127,17 +129,12 @@ int ARUI::Server::Manager::AruiDesktop::Run() {
 
   Render::StandardPipeline standardPipeline{*renderDevice};
   Runtime::PainterRegistry painters;
-  Runtime::RegisterFlatPainter(painters);
-  Language::Style surfaceStyle;
-  surfaceStyle.width = {1.0, Language::LengthUnit::Meter};
-  surfaceStyle.height = {0.75, Language::LengthUnit::Meter};
-  surfaceStyle.zOffset = {-2.0, Language::LengthUnit::Meter};
   Runtime::RuntimeTree runtime;
-  auto transaction = runtime.BeginTransaction();
-  transaction.InsertTree(
-      runtime.Root(),
-      Language::LSurface({Language::LText("ARUI Server")}, {}, surfaceStyle));
-  transaction.Commit();
+  std::mutex runtimeMutex;
+  Presentation::RuntimePresentationController presentation(runtime,
+                                                           runtimeMutex);
+  Presentation::PresentationRpcServer rpcServer(presentation);
+  rpcServer.Start();
   StereoStream stereoStream;
 
   while (!stopRequested && !openXRPresenter->ShouldExit()) {
@@ -158,11 +155,14 @@ int ARUI::Server::Manager::AruiDesktop::Run() {
       Render::RenderGraph graph;
       renderer.BeginFrame();
       Runtime::PaintContext paintContext{renderer};
-      for (const Runtime::NodeID surface : runtime.RootChildren())
-        Runtime::PaintRuntimeSurface(
-            paintContext, painters, runtime, surface,
-            {.localToClip = views[eye].projection * views[eye].view,
-             .pixelsPerMeter = 600.0F});
+      {
+        const std::scoped_lock lock(runtimeMutex);
+        for (const Runtime::NodeID surface : runtime.RootChildren())
+          Runtime::PaintRuntimeSurface(
+              paintContext, painters, runtime, surface,
+              {.localToClip = views[eye].projection * views[eye].view,
+               .pixelsPerMeter = 600.0F});
+      }
       renderer.BuildRenderGraph(graph);
       graph.Compile();
       graph.Execute(*renderDevice);

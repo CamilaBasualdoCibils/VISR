@@ -1,7 +1,9 @@
 #pragma once
+#include "ARUI/Language/AttributeValue.hpp"
 #include "ARUI/Language/Style.hpp"
 #include "ARUI/Language/node.hpp"
 #include "ARUI/Runtime/DrawingObjects.hpp"
+#include "ARUI/Runtime/RuntimeTree.hpp"
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/vector_float2.hpp>
 #include <memory>
@@ -12,17 +14,7 @@
 namespace ARUI::Runtime {
 inline constexpr std::string_view DefaultPainterName{"arui-flat-painter"};
 // Immutable output of layout. Painters do not compute bounds or placement.
-struct PaintNode {
-  Language::LNodeType type{};
-  glm::vec2 size{};
-  glm::mat4 localToWorld{1.0F};
-  // Top-left content origin supplied by layout (positive Y points up).
-  glm::mat4 contentOriginToWorld{1.0F};
-  const Language::Attributes *attributes{};
-  float fontSizePixels{16.0F};
-  float pixelsPerUnit{1.0F};
-  std::string_view fontFamily{"Noto Sans"};
-};
+
 using ComputedPainterStyle = Language::PainterStyleProperties;
 
 class PaintContext {
@@ -39,14 +31,29 @@ public:
 private:
   DrawingObjectSink &renderer_;
 };
+struct PaintTreeContext {
+  PaintContext &draw;
 
+  const RuntimeTree &tree;
+  NodeID root;
+
+  glm::mat4 localToWorld;
+
+  // Physical extent of the root surface.
+  glm::vec2 extent;
+
+  // Possibly runtime/environment information:
+  float pixelsPerMeter;
+  double time;
+};
 class IPainter {
 public:
   virtual ~IPainter() = default;
   [[nodiscard]] virtual const Language::PainterStyleSchema &
   StyleSchema() const noexcept = 0;
-  virtual void Paint(const PaintNode &, const ComputedPainterStyle &,
-                     PaintContext &) const = 0;
+  virtual void
+  Paint(const PaintTreeContext &context,
+        const Language::PainterStyleProperties &properties) const = 0;
 };
 
 class PainterRegistry {
@@ -60,7 +67,7 @@ public:
 private:
   std::unordered_map<std::string, std::shared_ptr<const IPainter>> painters_;
 };
-
+/*
 class FlatPainter final : public IPainter {
 public:
   [[nodiscard]] const Language::PainterStyleSchema &
@@ -80,5 +87,5 @@ private:
 
 using DefaultPanelPainter = FlatPainter;
 
-void RegisterFlatPainter(PainterRegistry &registry);
+void RegisterFlatPainter(PainterRegistry &registry); */
 } // namespace ARUI::Runtime

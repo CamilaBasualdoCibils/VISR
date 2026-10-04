@@ -187,9 +187,7 @@ struct CurveRenderObject {
 
 struct TextRenderObject {
   std::string text;
-  float fontSizePixels{16.0F};
-  // Bitmap pixels per local-space unit; keeps glyph geometry view-independent.
-  float pixelsPerUnit{1.0F};
+  Language::Length fontSize;
   std::string fontFamily{"Noto Sans"};
   Material material;
   Transform transform;

@@ -1,8 +1,10 @@
 #include "ARUI/Language/Parser.hpp"
+#include <array>
 #include <cctype>
 #include <charconv>
 #include <fstream>
 #include <pugixml.hpp>
+#include <span>
 #include <sstream>
 #include <string>
 #include <system_error>
@@ -10,24 +12,6 @@
 namespace ARUI::Language {
 namespace {
 std::string Trim(std::string_view value);
-
-std::optional<LNodeType> NodeType(std::string_view name) {
-  if (name == "group")
-    return LNodeType::Group;
-  if (name == "row")
-    return LNodeType::Row;
-  if (name == "column")
-    return LNodeType::Column;
-  if (name == "stack")
-    return LNodeType::Stack;
-  if (name == "text")
-    return LNodeType::Text;
-  if (name == "image")
-    return LNodeType::Image;
-  if (name == "panel")
-    return LNodeType::Panel;
-  return std::nullopt;
-}
 
 template <typename T>
 void Error(ParseResult<T> &result, std::string_view source, pugi::xml_node node,
@@ -79,38 +63,192 @@ std::optional<Length> ParsePhysicalLength(std::string_view input,
   return std::nullopt;
 }
 
+using AttributeParser = bool (*)(void *, std::string_view, std::string_view,
+                                 std::string &);
+struct AttributeSpec {
+  std::string_view name;
+  bool required;
+  AttributeParser parser;
+};
+struct ElementSpec {
+  std::string_view name;
+  LNodeType type;
+  std::span<const AttributeSpec> attributes;
+};
+
+bool ParseStringAttribute(void *target, std::string_view name,
+                          std::string_view value, std::string &) {
+  static_cast<LNode *>(target)->SetAttribute(std::string(name),
+                                             std::string(value));
+  return true;
+}
+bool ParseStateAttribute(void *target, std::string_view name,
+                         std::string_view value, std::string &) {
+  static_cast<LNode *>(target)->SetAttribute(
+      std::string(name), StateReference{std::string(value)});
+  return true;
+}
+bool ParseWidthAttribute(void *target, std::string_view, std::string_view value,
+                         std::string &reason) {
+  const auto length = ParsePhysicalLength(value, reason);
+  if (!length)
+    return false;
+  static_cast<LNode *>(target)->style.width = *length;
+  return true;
+}
+bool ParseHeightAttribute(void *target, std::string_view,
+                          std::string_view value, std::string &reason) {
+  const auto length = ParsePhysicalLength(value, reason);
+  if (!length)
+    return false;
+  static_cast<LNode *>(target)->style.height = *length;
+  return true;
+}
+bool ParseXOffsetAttribute(void *target, std::string_view,
+                          std::string_view value, std::string &reason) {
+  const auto length = ParsePhysicalLength(value, reason);
+  if (!length)
+    return false;
+  static_cast<LNode *>(target)->style.xOffset = *length;
+  return true;
+}
+bool ParseYOffsetAttribute(void *target, std::string_view,
+                          std::string_view value, std::string &reason) {
+  const auto length = ParsePhysicalLength(value, reason);
+  if (!length)
+    return false;
+  static_cast<LNode *>(target)->style.yOffset = *length;
+  return true;
+}
+bool ParseZOffsetAttribute(void *target, std::string_view,
+                          std::string_view value, std::string &reason) {
+  const auto length = ParsePhysicalLength(value, reason);
+  if (!length)
+    return false;
+  static_cast<LNode *>(target)->style.zOffset = *length;
+  return true;
+}
+bool ParseScriptTypeAttribute(void *target, std::string_view,
+                              std::string_view value, std::string &) {
+  static_cast<EmbeddedScript *>(target)->type = value;
+  return true;
+}
+
+constexpr AttributeSpec StringAttribute(std::string_view name,
+                                        bool required = false) {
+  return {name, required, ParseStringAttribute};
+}
+constexpr AttributeSpec StateAttribute(std::string_view name,
+                                       bool required = false) {
+  return {name, required, ParseStateAttribute};
+}
+constexpr AttributeSpec PhysicalLengthAttribute(std::string_view name,
+                                                AttributeParser parser,
+                                                bool required = false) {
+  return {name, required, parser};
+}
+
+constexpr auto CommonAttributes = std::to_array<AttributeSpec>(
+    {StringAttribute("class"), StringAttribute("behavior")});
+constexpr auto SurfaceAttributes = std::to_array<AttributeSpec>({
+    PhysicalLengthAttribute("width", ParseWidthAttribute, true),
+    PhysicalLengthAttribute("height", ParseHeightAttribute, true),
+    PhysicalLengthAttribute("x-offset", ParseXOffsetAttribute),
+    PhysicalLengthAttribute("y-offset", ParseYOffsetAttribute),
+    PhysicalLengthAttribute("z-offset", ParseZOffsetAttribute),
+    StringAttribute("anchor"),
+    StringAttribute("class"),
+    StringAttribute("behavior"),
+});
+constexpr auto GroupAttributes = std::to_array<AttributeSpec>(
+    {StringAttribute("class"), StringAttribute("behavior"),
+     StringAttribute("name")});
+constexpr auto TextAttributes = std::to_array<AttributeSpec>(
+    {StringAttribute("class"), StringAttribute("behavior"),
+     StateAttribute("state")});
+constexpr auto ImageAttributes = std::to_array<AttributeSpec>(
+    {StringAttribute("class"), StringAttribute("behavior"),
+     StringAttribute("src"), StringAttribute("alt")});
+constexpr auto PanelAttributes = std::to_array<AttributeSpec>(
+    {StringAttribute("class"), StringAttribute("behavior"),
+     StringAttribute("name")});
+constexpr auto ScriptAttributes = std::to_array<AttributeSpec>(
+    {AttributeSpec{"type", false, ParseScriptTypeAttribute}});
+constexpr std::array<AttributeSpec, 0> NoAttributes{};
+constexpr auto NodeSpecs = std::to_array<ElementSpec>({
+    {"group", LNodeType::Group, GroupAttributes},
+    {"row", LNodeType::Row, CommonAttributes},
+    {"column", LNodeType::Column, CommonAttributes},
+    {"stack", LNodeType::Stack, CommonAttributes},
+    {"text", LNodeType::Text, TextAttributes},
+    {"image", LNodeType::Image, ImageAttributes},
+    {"panel", LNodeType::Panel, PanelAttributes},
+});
+constexpr ElementSpec SurfaceSpec{"surface", LNodeType::Surface,
+                                  SurfaceAttributes};
+
+const ElementSpec *FindNodeSpec(std::string_view name) {
+  for (const auto &spec : NodeSpecs)
+    if (spec.name == name)
+      return &spec;
+  return nullptr;
+}
+
+template <typename T>
+bool ParseAttributes(ParseResult<Document> &result, std::string_view input,
+                     pugi::xml_node element,
+                     std::span<const AttributeSpec> specs, T &target,
+                     std::string_view noAttributesMessage = {}) {
+  for (auto attribute : element.attributes()) {
+    const std::string_view name = attribute.name();
+    const AttributeSpec *matched = nullptr;
+    for (const auto &spec : specs)
+      if (spec.name == name) {
+        matched = &spec;
+        break;
+      }
+    if (!matched) {
+      if (!noAttributesMessage.empty())
+        Error(result, input, element, std::string(noAttributesMessage));
+      else
+        Error(result, input, element,
+              "invalid attribute '" + std::string(name) + "' on <" +
+                  element.name() + "> (value '" + attribute.value() + "')");
+      return false;
+    }
+    std::string reason;
+    if (!matched->parser(&target, name, attribute.value(), reason)) {
+      Error(result, input, element,
+            "invalid <" + std::string(element.name()) + "> " +
+                std::string(name) + ": " + reason);
+      return false;
+    }
+  }
+  for (const auto &spec : specs)
+    if (spec.required && !element.attribute(spec.name.data())) {
+      Error(result, input, element,
+            "<" + std::string(element.name()) + "> is missing required '" +
+                std::string(spec.name) + "' attribute");
+      return false;
+    }
+  return true;
+}
+
 bool ReadNode(ParseResult<Document> &parsed, std::string_view input,
               pugi::xml_node source, LNode &result) {
-  const auto type = NodeType(source.name());
-  if (!type) {
+  const auto *spec = FindNodeSpec(source.name());
+  if (!spec) {
     Error(parsed, input, source,
           "unknown ARUI node <" + std::string(source.name()) + ">");
     return false;
   }
-  result.type = *type;
-  for (auto attribute : source.attributes()) {
-    const std::string name = attribute.name();
-    const std::string value = attribute.value();
-    const bool common = name == "class" || name == "behavior";
-    const bool named = name == "name" &&
-                       (*type == LNodeType::Group || *type == LNodeType::Panel);
-    const bool image =
-        *type == LNodeType::Image && (name == "src" || name == "alt");
-    if (name == "state" && *type == LNodeType::Text)
-      result.attributes.insert_or_assign(name, StateReference{value});
-    else if (common || named || image)
-      result.attributes.insert_or_assign(name, value);
-    else {
-      Error(parsed, input, source,
-            "invalid attribute '" + name + "' on <" + source.name() +
-                "> (value '" + value + "')");
-      return false;
-    }
-  }
+  result.type = spec->type;
+  if (!ParseAttributes(parsed, input, source, spec->attributes, result))
+    return false;
   std::string text;
   for (auto child : source.children()) {
     if (child.type() == pugi::node_element) {
-      if (*type == LNodeType::Text || *type == LNodeType::Image) {
+      if (spec->type == LNodeType::Text || spec->type == LNodeType::Image) {
         Error(parsed, input, child,
               "<" + std::string(source.name()) +
                   "> cannot contain child elements");
@@ -126,7 +264,7 @@ bool ReadNode(ParseResult<Document> &parsed, std::string_view input,
     }
   }
   text = Trim(text);
-  if (*type == LNodeType::Text) {
+  if (spec->type == LNodeType::Text) {
     if (!text.empty())
       result.attributes.insert_or_assign("text", std::move(text));
   } else if (!text.empty()) {
@@ -383,10 +521,9 @@ ParseResult<Document> ParseMarkup(std::string_view source) {
         {.message = "ARUI document root must be exactly one <arui> element"});
     return result;
   }
-  if (root.first_attribute()) {
-    Error(result, source, root, "<arui> does not accept attributes");
+  if (!ParseAttributes(result, source, root, NoAttributes, result.value,
+                       "<arui> does not accept attributes"))
     return result;
-  }
 
   for (auto child : root.children()) {
     if (child.type() == pugi::node_comment ||
@@ -401,10 +538,9 @@ ParseResult<Document> ParseMarkup(std::string_view source) {
     }
     const std::string_view name = child.name();
     if (name == "style") {
-      if (child.first_attribute()) {
-        Error(result, source, child, "<style> does not accept attributes");
+      if (!ParseAttributes(result, source, child, NoAttributes, result.value,
+                           "<style> does not accept attributes"))
         return result;
-      }
       std::string stylesheet;
       for (auto content : child.children()) {
         if (content.type() == pugi::node_pcdata ||
@@ -424,15 +560,9 @@ ParseResult<Document> ParseMarkup(std::string_view source) {
                   std::string(external.value()));
         return result;
       }
-      for (auto attribute : child.attributes()) {
-        if (std::string_view(attribute.name()) != "type") {
-          Error(result, source, child,
-                "invalid attribute '" + std::string(attribute.name()) +
-                    "' on <script>");
-          return result;
-        }
-      }
-      EmbeddedScript script{.type = child.attribute("type").value()};
+      EmbeddedScript script;
+      if (!ParseAttributes(result, source, child, ScriptAttributes, script))
+        return result;
       for (auto content : child.children()) {
         if (content.type() == pugi::node_pcdata ||
             content.type() == pugi::node_cdata)
@@ -445,43 +575,10 @@ ParseResult<Document> ParseMarkup(std::string_view source) {
       }
       result.value.scripts.push_back(std::move(script));
     } else if (name == "surface") {
-      LNode surface{.type = LNodeType::Surface};
-      for (auto attribute : child.attributes()) {
-        const std::string attributeName = attribute.name();
-        if (attributeName == "width" || attributeName == "height")
-          continue;
-        if (attributeName == "anchor" || attributeName == "class" ||
-            attributeName == "behavior")
-          surface.attributes.insert_or_assign(attributeName,
-                                              std::string(attribute.value()));
-        else {
-          Error(result, source, child,
-                "invalid attribute '" + attributeName +
-                    "' on <surface> (value '" + attribute.value() + "')");
-          return result;
-        }
-      }
-      for (const auto dimension :
-           {std::string_view("width"), std::string_view("height")}) {
-        const auto attribute = child.attribute(dimension.data());
-        if (!attribute) {
-          Error(result, source, child,
-                "<surface> is missing required '" + std::string(dimension) +
-                    "' attribute");
-          return result;
-        }
-        std::string reason;
-        const auto length = ParsePhysicalLength(attribute.value(), reason);
-        if (!length) {
-          Error(result, source, child,
-                "invalid <surface> " + std::string(dimension) + ": " + reason);
-          return result;
-        }
-        if (dimension == "width")
-          surface.style.width = *length;
-        else
-          surface.style.height = *length;
-      }
+      LNode surface{.type = SurfaceSpec.type};
+      if (!ParseAttributes(result, source, child, SurfaceSpec.attributes,
+                           surface))
+        return result;
       std::string surfaceText;
       for (auto content : child.children()) {
         if (content.type() == pugi::node_element) {

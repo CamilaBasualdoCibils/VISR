@@ -51,17 +51,19 @@ digraph ARUIArchitecture {
   }
   subgraph cluster_integration {
     label="Composition roots / implementations"; color="#9b83bd";
-    manager [label="Server/Manager\ncoordinates services" fillcolor="#f0eafa"];
-    desktop [label="Server/Desktop\nselects implementations; frame loop" fillcolor="#f0eafa"];
+    server [label="Server/Runtime\nlong-lived ARUI service + frame loop" fillcolor="#f0eafa"];
+    presentation_rpc [label="Presentation RPC\nIPresentationController endpoint" fillcolor="#f0eafa"];
+    system_experiences [label="AR-OS Boot / Login / Desktop\nOS policy (external)" fillcolor="#f6e8f4"];
     simulator [label="Tools/Simulator\ndev XR implementations" fillcolor="#f0eafa"];
-    openxr [label="XR/OpenXR\nproduction target (planned)" fillcolor="#f0eafa"];
-    desktop -> manager [label=uses];
+    openxr [label="XR/OpenXR\nproduction implementation" fillcolor="#f0eafa"];
+    system_experiences -> presentation_rpc [label="privileged RPC"];
+    presentation_rpc -> server [label="mutates runtime"];
     simulator -> { presentation views tracking } [label=implements arrowhead=empty];
     openxr -> { presentation views tracking } [label=implements arrowhead=empty style=dashed];
   }
   runtime -> paint_node [label="layout output" style=dashed];
-  desktop -> { renderer render_graph device presentation } [label="owns / drives"];
-  manager -> { runtime renderer_api views tracking presentation } [label=coordinates style=dashed];
+  server -> { runtime renderer render_graph device presentation views tracking } [label="owns / drives"];
+  presentation_rpc -> runtime [label="transactional control"];
   views -> renderer [label="one render per view" style=dashed color="#4f8b49"];
   tracking -> runtime [label="interaction input" style=dashed color="#4f8b49"];
   renderer -> target [label="renders into" style=dashed color="#b87522"];
