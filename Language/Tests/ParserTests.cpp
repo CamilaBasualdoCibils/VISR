@@ -52,6 +52,37 @@ TEST(Parser, ParsesMultipleSurfacesAndAllPhysicalUnits) {
   EXPECT_EQ(parsed.value.surfaces[1].style.width.unit, LengthUnit::Meter);
 }
 
+TEST(Parser, ParsesSurfaceRotationsInDegreesAndRadians) {
+  const auto parsed = ParseMarkup(R"(<arui>
+    <surface width="20cm" height="10cm"
+      x-rotation="45deg" y-rotation="-1.5rad" z-rotation="0deg"/>
+  </arui>)");
+  ASSERT_TRUE(parsed) << parsed.diagnostics.front().message;
+  const auto &style = OnlySurface(parsed).style;
+  ASSERT_TRUE(style.xRotation);
+  EXPECT_DOUBLE_EQ(style.xRotation->value, 45.0);
+  EXPECT_EQ(style.xRotation->unit, AngleUnit::Degree);
+  ASSERT_TRUE(style.yRotation);
+  EXPECT_DOUBLE_EQ(style.yRotation->value, -1.5);
+  EXPECT_EQ(style.yRotation->unit, AngleUnit::Radian);
+  ASSERT_TRUE(style.zRotation);
+  EXPECT_DOUBLE_EQ(style.zRotation->value, 0.0);
+  EXPECT_EQ(style.zRotation->unit, AngleUnit::Degree);
+}
+
+TEST(Parser, RejectsMalformedAndUnsupportedSurfaceRotations) {
+  for (const auto value : {"turn", "45", "45turn", "1.2.3deg"}) {
+    const auto parsed = ParseMarkup(
+        "<arui><surface width='1m' height='1m' x-rotation='" +
+        std::string(value) + "'/></arui>");
+    EXPECT_FALSE(parsed) << value;
+    ASSERT_FALSE(parsed.diagnostics.empty());
+    EXPECT_NE(parsed.diagnostics.front().message.find("rotation"),
+              std::string::npos)
+        << parsed.diagnostics.front().message;
+  }
+}
+
 TEST(Parser, ExtractsStylesScriptsAndBehavior) {
   const auto parsed = ParseMarkup(R"(<arui>
     <style>.control { padding: 5mm; }</style>

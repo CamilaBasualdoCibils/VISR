@@ -1,2 +1,3 @@
 add_subdirectory(Simulator)
 add_subdirectory(MarkupViewer)
+add_subdirectory(ManualPresenter)

@@ -47,7 +47,7 @@ std::optional<Length> ParsePhysicalLength(std::string_view input,
   const auto parsed = std::from_chars(
       numberText.data(), numberText.data() + numberText.size(), number);
   if (parsed.ec != std::errc{} ||
-      parsed.ptr != numberText.data() + numberText.size() || number <= 0.0) {
+      parsed.ptr != numberText.data() + numberText.size()) {
     reason = "malformed physical length '" + value + "'";
     return std::nullopt;
   }
@@ -63,6 +63,37 @@ std::optional<Length> ParsePhysicalLength(std::string_view input,
   return std::nullopt;
 }
 
+std::optional<Angle> ParsePhysicalAngle(std::string_view input,
+                                         std::string &reason) {
+  const auto value = Trim(input);
+  std::size_t unitStart = 0;
+  while (unitStart < value.size() &&
+         (std::isdigit(static_cast<unsigned char>(value[unitStart])) ||
+          value[unitStart] == '+' || value[unitStart] == '-' ||
+          value[unitStart] == '.'))
+    ++unitStart;
+  if (unitStart == 0) {
+    reason = "malformed physical angle '" + value + "'";
+    return std::nullopt;
+  }
+  double number{};
+  const auto numberText = std::string_view(value).substr(0, unitStart);
+  const auto parsed = std::from_chars(
+      numberText.data(), numberText.data() + numberText.size(), number);
+  if (parsed.ec != std::errc{} ||
+      parsed.ptr != numberText.data() + numberText.size()) {
+    reason = "malformed physical angle '" + value + "'";
+    return std::nullopt;
+  }
+  const auto unit = std::string_view(value).substr(unitStart);
+  if (unit == "deg")
+    return Angle{number, AngleUnit::Degree};
+  if (unit == "rad")
+    return Angle{number, AngleUnit::Radian};
+  reason = "unsupported physical angle unit in '" + value +
+           "' (expected deg or rad)";
+  return std::nullopt;
+}
 using AttributeParser = bool (*)(void *, std::string_view, std::string_view,
                                  std::string &);
 struct AttributeSpec {
@@ -128,6 +159,30 @@ bool ParseZOffsetAttribute(void *target, std::string_view,
   static_cast<LNode *>(target)->style.zOffset = *length;
   return true;
 }
+bool ParseXRotationAttribute(void *target, std::string_view,
+                            std::string_view value, std::string &reason) {
+  const auto angle = ParsePhysicalAngle(value, reason);
+  if (!angle)
+    return false;
+  static_cast<LNode *>(target)->style.xRotation = *angle;
+  return true;
+}
+bool ParseYRotationAttribute(void *target, std::string_view,
+                            std::string_view value, std::string &reason) {
+  const auto angle = ParsePhysicalAngle(value, reason);
+  if (!angle)
+    return false;
+  static_cast<LNode *>(target)->style.yRotation = *angle;
+  return true;
+}
+bool ParseZRotationAttribute(void *target, std::string_view,
+                            std::string_view value, std::string &reason) {
+  const auto angle = ParsePhysicalAngle(value, reason);
+  if (!angle)
+    return false;
+  static_cast<LNode *>(target)->style.zRotation = *angle;
+  return true;
+}
 bool ParseScriptTypeAttribute(void *target, std::string_view,
                               std::string_view value, std::string &) {
   static_cast<EmbeddedScript *>(target)->type = value;
@@ -147,6 +202,11 @@ constexpr AttributeSpec PhysicalLengthAttribute(std::string_view name,
                                                 bool required = false) {
   return {name, required, parser};
 }
+constexpr AttributeSpec PhysicalAngleAttribute(std::string_view name,
+                                               AttributeParser parser,
+                                               bool required = false) {
+  return {name, required, parser};
+}
 
 constexpr auto CommonAttributes = std::to_array<AttributeSpec>(
     {StringAttribute("class"), StringAttribute("behavior")});
@@ -156,6 +216,9 @@ constexpr auto SurfaceAttributes = std::to_array<AttributeSpec>({
     PhysicalLengthAttribute("x-offset", ParseXOffsetAttribute),
     PhysicalLengthAttribute("y-offset", ParseYOffsetAttribute),
     PhysicalLengthAttribute("z-offset", ParseZOffsetAttribute),
+    PhysicalAngleAttribute("x-rotation", ParseXRotationAttribute),
+    PhysicalAngleAttribute("y-rotation", ParseYRotationAttribute),
+    PhysicalAngleAttribute("z-rotation", ParseZRotationAttribute),
     StringAttribute("anchor"),
     StringAttribute("class"),
     StringAttribute("behavior"),
