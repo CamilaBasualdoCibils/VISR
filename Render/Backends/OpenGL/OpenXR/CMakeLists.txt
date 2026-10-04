@@ -1,9 +1,9 @@
-add_library(ARUIRenderOpenGLOpenXR STATIC
+add_library(VISRRenderOpenGLOpenXR STATIC
     ../OpenGLOpenXRBinding.cpp)
-add_library(ARUI::RenderOpenGLOpenXR ALIAS ARUIRenderOpenGLOpenXR)
-target_link_libraries(ARUIRenderOpenGLOpenXR PUBLIC
-    ARUI::OpenXR
-    ARUI::RenderOpenGL
+add_library(VISR::RenderOpenGLOpenXR ALIAS VISRRenderOpenGLOpenXR)
+target_link_libraries(VISRRenderOpenGLOpenXR PUBLIC
+    VISR::OpenXR
+    VISR::RenderOpenGL
     OpenXR::headers
     OpenXR::openxr_loader
     OpenGL::EGL

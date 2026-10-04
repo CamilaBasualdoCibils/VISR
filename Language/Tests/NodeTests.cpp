@@ -1,7 +1,7 @@
-#include "ARUI/Language/node.hpp"
+#include "VISR/Language/node.hpp"
 #include <gtest/gtest.h>
 
-using namespace ARUI::Language;
+using namespace VISR::Language;
 
 TEST(NodeStyle, PresentationIsStoredSeparatelyFromAttributes) {
   Style style;

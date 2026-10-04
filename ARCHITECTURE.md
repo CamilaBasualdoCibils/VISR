@@ -1,4 +1,4 @@
-# ARUI architecture
+# VISR architecture
 
 ```text
 Core
@@ -30,7 +30,7 @@ Server
 ## Ownership
 
 - **Application** defines the fundamental native contract between an app and
-  the ARUI environment. Apps register state, actions, metadata, and optional
+  the VISR environment. Apps register state, actions, metadata, and optional
   templates. Applications do not own windows or visual surfaces.
 - **Scripting** owns JavaScript hosting, bindings, and programmable panels. It
   adapts scripts to the Application contract.
@@ -44,9 +44,9 @@ Server
 - **Presentation** defines the privileged `IPresentationController`, its rpclib
   client proxy and endpoint, and the runtime-backed implementation. It is not
   part of the normal Application contract.
-- **Server/Runtime** is the long-lived ARUI composition root. It owns Runtime,
+- **Server/Runtime** is the long-lived VISR composition root. It owns Runtime,
   rendering, XR, and the presentation RPC service. Boot, Login, Desktop,
-  Managers, and OS presentation policy remain in AR-OS.
+  Managers, and OS presentation policy remain in VISR OS.
 
 The dependency direction is from integration layers toward contracts:
 

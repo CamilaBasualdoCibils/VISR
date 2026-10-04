@@ -1,8 +1,8 @@
-add_executable(AruiServer main.cpp AruiServer.cpp)
-target_link_libraries(AruiServer PRIVATE
-    ARUI::PresentationServer
-    ARUI::RenderOpenGL
-    ARUI::OpenXR
-    ARUI::RenderOpenGLOpenXR
+add_executable(VisrServer main.cpp VisrServer.cpp)
+target_link_libraries(VisrServer PRIVATE
+    VISR::PresentationServer
+    VISR::RenderOpenGL
+    VISR::OpenXR
+    VISR::RenderOpenGLOpenXR
     Boost::program_options)
-arui_enable_runtime_instrumentation(AruiServer)
+visr_enable_runtime_instrumentation(VisrServer)

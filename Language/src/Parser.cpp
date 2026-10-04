@@ -1,4 +1,4 @@
-#include "ARUI/Language/Parser.hpp"
+#include "VISR/Language/Parser.hpp"
 #include <array>
 #include <cctype>
 #include <charconv>
@@ -9,7 +9,7 @@
 #include <string>
 #include <system_error>
 
-namespace ARUI::Language {
+namespace VISR::Language {
 namespace {
 std::string Trim(std::string_view value);
 
@@ -302,7 +302,7 @@ bool ReadNode(ParseResult<Document> &parsed, std::string_view input,
   const auto *spec = FindNodeSpec(source.name());
   if (!spec) {
     Error(parsed, input, source,
-          "unknown ARUI node <" + std::string(source.name()) + ">");
+          "unknown VISR node <" + std::string(source.name()) + ">");
     return false;
   }
   result.type = spec->type;
@@ -579,13 +579,13 @@ ParseResult<Document> ParseMarkup(std::string_view source) {
   for (auto child : xml.children())
     if (child.type() == pugi::node_element)
       ++rootElements;
-  if (!root || rootElements != 1 || std::string_view(root.name()) != "arui") {
+  if (!root || rootElements != 1 || std::string_view(root.name()) != "visr") {
     result.diagnostics.push_back(
-        {.message = "ARUI document root must be exactly one <arui> element"});
+        {.message = "VISR document root must be exactly one <visr> element"});
     return result;
   }
   if (!ParseAttributes(result, source, root, NoAttributes, result.value,
-                       "<arui> does not accept attributes"))
+                       "<visr> does not accept attributes"))
     return result;
 
   for (auto child : root.children()) {
@@ -594,7 +594,7 @@ ParseResult<Document> ParseMarkup(std::string_view source) {
       continue;
     if (child.type() == pugi::node_pcdata || child.type() == pugi::node_cdata) {
       if (!Trim(child.value()).empty()) {
-        Error(result, source, child, "unexpected text directly inside <arui>");
+        Error(result, source, child, "unexpected text directly inside <visr>");
         return result;
       }
       continue;
@@ -619,7 +619,7 @@ ParseResult<Document> ParseMarkup(std::string_view source) {
     } else if (name == "script") {
       if (const auto external = child.attribute("src")) {
         Error(result, source, child,
-              "External ARUI scripts are not supported yet: " +
+              "External VISR scripts are not supported yet: " +
                   std::string(external.value()));
         return result;
       }
@@ -661,7 +661,7 @@ ParseResult<Document> ParseMarkup(std::string_view source) {
       result.value.surfaces.push_back(std::move(surface));
     } else {
       Error(result, source, child,
-            "unsupported top-level ARUI element <" + std::string(child.name()) +
+            "unsupported top-level VISR element <" + std::string(child.name()) +
                 ">");
       return result;
     }
@@ -693,7 +693,7 @@ ParseResult<Document> ParseMarkupFile(const std::filesystem::path &path) {
   std::ifstream stream(path, std::ios::binary);
   if (!stream)
     return {.diagnostics = {
-                {.message = "unable to read ARUI file: " + path.string()}}};
+                {.message = "unable to read VISR file: " + path.string()}}};
   std::ostringstream contents;
   contents << stream.rdbuf();
   return ParseMarkup(contents.str());
@@ -702,4 +702,4 @@ ParseResult<Document> ParseMarkupFile(const std::filesystem::path &path) {
 ParseResult<StyleSheet> ParseStyles(std::string_view source) {
   return StyleParser(source).Parse();
 }
-} // namespace ARUI::Language
+} // namespace VISR::Language

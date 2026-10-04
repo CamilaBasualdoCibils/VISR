@@ -1,9 +1,9 @@
-#include "ARUI/Application/Application.hpp"
-#include "ARUI/Runtime/RuntimeTree.hpp"
+#include "VISR/Application/Application.hpp"
+#include "VISR/Runtime/RuntimeTree.hpp"
 
 #include <gtest/gtest.h>
 
-using namespace ARUI;
+using namespace VISR;
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

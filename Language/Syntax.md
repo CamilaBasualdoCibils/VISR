@@ -1,15 +1,15 @@
-# ARUI Syntax
+# VISR Syntax
 
-ARUI is a declarative language for describing **spatial user
+VISR is a declarative language for describing **spatial user
 interfaces**.
 
-Unlike a traditional desktop, ARUI does not assume that every
+Unlike a traditional desktop, VISR does not assume that every
 application owns a window. Applications expose **state** and
-**actions**, and ARUI decides how those capabilities are composed into a
+**actions**, and VISR decides how those capabilities are composed into a
 shared interface.
 
 ``` text
-Apps → State + Actions → ARUI → Spatial Interface
+Apps → State + Actions → VISR → Spatial Interface
 ```
 
 ## Example
@@ -81,7 +81,7 @@ They describe organization, not application boundaries.
 Groups do not render anything themselves. They have no background,
 geometry, or appearance.
 
-They simply tell ARUI that their contents conceptually belong together.
+They simply tell VISR that their contents conceptually belong together.
 This allows a user or layout manager to understand and reorganize the
 interface later.
 
@@ -135,7 +135,7 @@ region backed by JavaScript.
 />
 ```
 
-The script can use the ARUI JavaScript API to read state, invoke
+The script can use the VISR JavaScript API to read state, invoke
 actions, draw raw shapes, create custom visuals, and handle
 interactions.
 
@@ -151,7 +151,7 @@ App
       └── UI
 ```
 
-ARUI instead works like:
+VISR instead works like:
 
 ``` text
 Weather ───── State ─────┐
@@ -160,7 +160,7 @@ Music ─────── State ─────┤
 Music ─────── Actions ───┤
 Navigation ── State ─────┤
                          ▼
-                    ARUI Layout
+                    VISR Layout
                          │
                          ▼
                 Shared Spatial UI

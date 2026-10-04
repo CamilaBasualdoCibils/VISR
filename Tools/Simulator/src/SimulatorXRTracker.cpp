@@ -1,9 +1,9 @@
-#include "ARUI/Tools/Simulator/SimulatorXRTracker.hpp"
-#include "ARUI/XR/OpenXR/OpenXRTrackingProvider.hpp"
+#include "VISR/Tools/Simulator/SimulatorXRTracker.hpp"
+#include "VISR/XR/OpenXR/OpenXRTrackingProvider.hpp"
 
 #include <algorithm>
 
-namespace ARUI::Tools::Simulator {
+namespace VISR::Tools::Simulator {
 
 SimulatorXRTracker::SimulatorXRTracker() {
   for (auto &trackedPose : poses_) {
@@ -150,4 +150,4 @@ size_t SimulatorXRTracker::GetJoints(std::span<std::string_view> jointNames) {
   return useOpenXR_ && openXR_ ? openXR_->GetJoints(jointNames) : count;
 }
 
-} // namespace ARUI::Tools::Simulator
+} // namespace VISR::Tools::Simulator

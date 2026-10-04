@@ -1,5 +1,5 @@
-#include "ARUI/Render/Backends/OpenGL/OpenGLOpenXRBinding.hpp"
-#include "ARUI/Render/Backends/OpenGL/OpenGLRenderDevice.hpp"
+#include "VISR/Render/Backends/OpenGL/OpenGLOpenXRBinding.hpp"
+#include "VISR/Render/Backends/OpenGL/OpenGLRenderDevice.hpp"
 #include <EGL/egl.h>
 #include <GL/glew.h>
 #define XR_USE_GRAPHICS_API_OPENGL
@@ -9,7 +9,7 @@
 #include <array>
 #include <vector>
 
-namespace ARUI::Render {
+namespace VISR::Render {
 namespace {
 PFN_xrVoidFunction GetEGLProcAddress(const char *name) {
   return reinterpret_cast<PFN_xrVoidFunction>(eglGetProcAddress(name));
@@ -124,4 +124,4 @@ bool OpenGLOpenXRBinding::CopyRenderTarget(
   glFlush();
   return complete;
 }
-} // namespace ARUI::Render
+} // namespace VISR::Render

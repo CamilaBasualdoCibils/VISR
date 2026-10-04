@@ -1,11 +1,11 @@
-add_executable(ARUILanguageTests ParserTests.cpp NodeTests.cpp)
+add_executable(VISRLanguageTests ParserTests.cpp NodeTests.cpp)
 find_package(GTest CONFIG REQUIRED)
 
-target_link_libraries(ARUILanguageTests PRIVATE 
-ARUI::Language
-GTest::gtest 
-GTest::gtest_main 
-GTest::gmock 
+target_link_libraries(VISRLanguageTests PRIVATE
+VISR::Language
+GTest::gtest
+GTest::gtest_main
+GTest::gmock
 GTest::gmock_main)
 include(GoogleTest)
-gtest_discover_tests(ARUILanguageTests)
+gtest_discover_tests(VISRLanguageTests)

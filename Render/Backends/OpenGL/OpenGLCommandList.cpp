@@ -1,6 +1,6 @@
-#include "ARUI/Render/Backends/OpenGL/OpenGLCommandList.hpp"
-#include "ARUI/Render/Backends/OpenGL/OpenGLCommons.hpp"
-#include "ARUI/Render/Backends/OpenGL/OpenGLRenderDevice.hpp"
+#include "VISR/Render/Backends/OpenGL/OpenGLCommandList.hpp"
+#include "VISR/Render/Backends/OpenGL/OpenGLCommons.hpp"
+#include "VISR/Render/Backends/OpenGL/OpenGLRenderDevice.hpp"
 
 #if defined(TRACY_ENABLE)
 #include <tracy/TracyOpenGL.hpp>
@@ -10,7 +10,7 @@ namespace {
 thread_local GLuint activeFramebuffer = 0;
 }
 
-void ARUI::Render::OpenGLCommandList::BeginRenderCommand::Execute(
+void VISR::Render::OpenGLCommandList::BeginRenderCommand::Execute(
     OpenGLRenderDevice *renderDevice) {
 #if defined(TRACY_ENABLE)
   TracyGpuZone("OpenGL Begin Render Pass");
@@ -37,7 +37,7 @@ void ARUI::Render::OpenGLCommandList::BeginRenderCommand::Execute(
   }
 }
 
-void ARUI::Render::OpenGLCommandList::EndRenderCommand::Execute(
+void VISR::Render::OpenGLCommandList::EndRenderCommand::Execute(
     OpenGLRenderDevice *) {
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   if (activeFramebuffer != 0) {
@@ -46,7 +46,7 @@ void ARUI::Render::OpenGLCommandList::EndRenderCommand::Execute(
   }
 }
 
-void ARUI::Render::OpenGLCommandList::BindPipelineCommand::Execute(
+void VISR::Render::OpenGLCommandList::BindPipelineCommand::Execute(
     OpenGLRenderDevice *renderDevice) {
   glBindVertexArray(renderDevice->GetGLPipeline(handle).vaoId);
   glUseProgram(renderDevice->GetGLPipeline(handle).programId);
@@ -58,22 +58,22 @@ void ARUI::Render::OpenGLCommandList::BindPipelineCommand::Execute(
   }
 }
 
-void ARUI::Render::OpenGLCommandList::BindVertexBufferCommand::Execute(
+void VISR::Render::OpenGLCommandList::BindVertexBufferCommand::Execute(
     OpenGLRenderDevice *renderDevice) {
   glBindVertexBuffer(0, renderDevice->GetGLBuffer(handle).id, 0, stride);
 }
 
-void ARUI::Render::OpenGLCommandList::BindIndexBufferCommand::Execute(
+void VISR::Render::OpenGLCommandList::BindIndexBufferCommand::Execute(
     OpenGLRenderDevice *renderDevice) {
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderDevice->GetGLBuffer(handle).id);
 }
 
-void ARUI::Render::OpenGLCommandList::BindTextureCommand::Execute(
+void VISR::Render::OpenGLCommandList::BindTextureCommand::Execute(
     OpenGLRenderDevice *renderDevice) {
   glBindTextureUnit(slot, renderDevice->GetGLTexture(handle).id);
 }
 
-void ARUI::Render::OpenGLCommandList::DrawCommand::Execute(
+void VISR::Render::OpenGLCommandList::DrawCommand::Execute(
     OpenGLRenderDevice *) {
 #if defined(TRACY_ENABLE)
   TracyGpuZone("OpenGL Draw");
@@ -85,7 +85,7 @@ void ARUI::Render::OpenGLCommandList::DrawCommand::Execute(
                                     instanceCount, firstInstance);
 }
 
-void ARUI::Render::OpenGLCommandList::DrawIndexedCommand::Execute(
+void VISR::Render::OpenGLCommandList::DrawIndexedCommand::Execute(
     OpenGLRenderDevice *) {
 #if defined(TRACY_ENABLE)
   TracyGpuZone("OpenGL Draw Indexed");

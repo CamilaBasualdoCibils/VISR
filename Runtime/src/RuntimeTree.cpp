@@ -1,11 +1,11 @@
-#include "ARUI/Runtime/RuntimeTree.hpp"
+#include "VISR/Runtime/RuntimeTree.hpp"
 
 #include <algorithm>
 #include <stdexcept>
 #include <unordered_set>
 #include <utility>
 
-namespace ARUI::Runtime {
+namespace VISR::Runtime {
 
 RNode *RuntimeTree::Get(NodeID id) {
   const auto it = nodes_.find(id);
@@ -221,4 +221,4 @@ void RuntimeTransaction::Commit(CommitOptions options) {
   finished_ = true;
 }
 
-} // namespace ARUI::Runtime
+} // namespace VISR::Runtime

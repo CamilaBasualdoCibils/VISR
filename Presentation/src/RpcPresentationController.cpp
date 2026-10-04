@@ -1,4 +1,4 @@
-#include "ARUI/Presentation/RpcPresentationController.hpp"
+#include "VISR/Presentation/RpcPresentationController.hpp"
 
 #include "Wire.hpp"
 
@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-namespace ARUI::Presentation {
+namespace VISR::Presentation {
 class RpcPresentationController::Impl {
 public:
   Impl(std::string host, std::uint16_t port) : client(std::move(host), port) {
@@ -23,7 +23,7 @@ public:
       }
       std::this_thread::sleep_for(std::chrono::milliseconds{100});
     }
-    throw std::runtime_error("ARUI presentation service is unavailable");
+    throw std::runtime_error("VISR presentation service is unavailable");
   }
   rpc::client client;
 };
@@ -64,4 +64,4 @@ void RpcPresentationController::Clear() {
   impl_->client.call("presentation.clear");
 }
 
-} // namespace ARUI::Presentation
+} // namespace VISR::Presentation

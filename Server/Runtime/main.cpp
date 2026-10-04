@@ -1,16 +1,16 @@
-#include "ARUI/Core/Debug/AllowDebugger.hpp"
-#include "AruiServer.hpp"
+#include "VISR/Core/Debug/AllowDebugger.hpp"
+#include "VisrServer.hpp"
 
 #include <exception>
 #include <iostream>
 
 int main(int argc, char **argv) {
-  ARUI::Debug::AllowConfiguredDebuggerAttach();
+  VISR::Debug::AllowConfiguredDebuggerAttach();
   try {
-    ARUI::Server::AruiServer server(argc, argv);
+    VISR::Server::VisrServer server(argc, argv);
     return server.Run();
   } catch (const std::exception &error) {
-    std::cerr << "arui-server: " << error.what() << '\n';
+    std::cerr << "visr-server: " << error.what() << '\n';
     return 1;
   }
 }

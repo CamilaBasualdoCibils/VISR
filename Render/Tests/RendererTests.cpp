@@ -1,18 +1,18 @@
-#include "ARUI/Render/Font.hpp"
-#include "ARUI/Render/IRenderDevice.hpp"
-#include "ARUI/Render/RenderGraph.hpp"
-#include "ARUI/Render/Renderer.hpp"
-#include "ARUI/Runtime/IPainter.hpp"
-#include "ARUI/Runtime/RuntimePainter.hpp"
-#include "ARUI/Runtime/RuntimeTree.hpp"
+#include "VISR/Render/Font.hpp"
+#include "VISR/Render/IRenderDevice.hpp"
+#include "VISR/Render/RenderGraph.hpp"
+#include "VISR/Render/Renderer.hpp"
+#include "VISR/Runtime/IPainter.hpp"
+#include "VISR/Runtime/RuntimePainter.hpp"
+#include "VISR/Runtime/RuntimeTree.hpp"
 
 #include <algorithm>
 #include <cstring>
 #include <glm/ext/matrix_transform.hpp>
 #include <gtest/gtest.h>
 
-using namespace ARUI::Render;
-using namespace ARUI::Runtime;
+using namespace VISR::Render;
+using namespace VISR::Runtime;
 
 namespace {
 struct RecordedCommands {
@@ -123,7 +123,7 @@ TEST(Renderer, CollectsEveryHighLevelPrimitiveWithoutImmediateGpuWork) {
   renderer.Submit(SurfaceRenderObject{.geometry = PlaneSurface{}});
   renderer.Submit(ShapeRenderObject{.geometry = RectangleShape{}});
   renderer.Submit(CurveRenderObject{});
-  renderer.Submit(TextRenderObject{.text = "ARUI"});
+  renderer.Submit(TextRenderObject{.text = "VISR"});
   renderer.Submit(
       MeshRenderObject{.geometry = {.positions = {{-0.5F, -0.5F, 0.0F},
                                                   {0.5F, -0.5F, 0.0F},
@@ -239,8 +239,8 @@ TEST(Renderer, RasterizesPhysicalTextAndTransformsItsQuad) {
   RenderGraph graph;
   renderer.BeginFrame();
   renderer.Submit(TextRenderObject{
-      .text = "ARUI",
-      .fontSize = {6.0, ARUI::Language::LengthUnit::Millimeter},
+      .text = "VISR",
+      .fontSize = {6.0, VISR::Language::LengthUnit::Millimeter},
       .transform = {.localToWorld =
                         glm::translate(glm::mat4{1.0F}, {1.0F, 2.0F, -3.0F})}});
   renderer.BuildRenderGraph(graph);
@@ -274,7 +274,7 @@ TEST(Renderer, TessellatesPhysicalStrokePathsInTheConfiguredView) {
   renderer.BeginFrame();
   renderer.StrokePath(
       {.path = std::move(path),
-       .style = {.width = {2.0, ARUI::Language::LengthUnit::Centimeter}},
+       .style = {.width = {2.0, VISR::Language::LengthUnit::Centimeter}},
        .transform = {.localToWorld = glm::mat4{1.0F}}});
   renderer.BuildRenderGraph(graph);
   graph.Compile();
@@ -309,7 +309,7 @@ TEST(SemanticPath, PreservesCubicCurvesWithoutFlattening) {
       .Close();
   SemanticRecorder renderer;
   renderer.FillPath({.path = path,
-                     .style = {.fill = SolidFill{ARUI::Language::Color{
+                     .style = {.fill = SolidFill{VISR::Language::Color{
                                    {1.0F, 1.0F, 1.0F, 1.0F}}}}});
   ASSERT_EQ(renderer.fills.size(), 1u);
   ASSERT_EQ(renderer.fills[0].path.commands.size(), 3u);
@@ -319,12 +319,12 @@ TEST(SemanticPath, PreservesCubicCurvesWithoutFlattening) {
 }
 
 TEST(Color, ConvertsAuthoredSRGBHexToLinearFloatColor) {
-  const auto black = ARUI::Language::ParseSRGBHexColor("#000000");
+  const auto black = VISR::Language::ParseSRGBHexColor("#000000");
   ASSERT_TRUE(black);
   EXPECT_FLOAT_EQ(black->rgba.r, 0.0F);
   EXPECT_FLOAT_EQ(black->rgba.a, 1.0F);
 
-  const auto mid = ARUI::Language::ParseSRGBHexColor("#80808080");
+  const auto mid = VISR::Language::ParseSRGBHexColor("#80808080");
   ASSERT_TRUE(mid);
   EXPECT_NEAR(mid->rgba.r, 0.21586F, 0.0001F);
   EXPECT_NEAR(mid->rgba.g, 0.21586F, 0.0001F);

@@ -1,11 +1,11 @@
-#include "ARUI/Tools/Simulator/SimulatorApplication.hpp"
-#include "ARUI/Render/Backends/OpenGL/OpenGLOpenXRBinding.hpp"
+#include "VISR/Tools/Simulator/SimulatorApplication.hpp"
+#include "VISR/Render/Backends/OpenGL/OpenGLOpenXRBinding.hpp"
 
-#include "ARUI/Render/RenderGraph.hpp"
-#include "ARUI/Render/Renderer.hpp"
-#include "ARUI/Render/StandardPipeline.hpp"
-#include "ARUI/Runtime/Painters/AruiFlatPainter.hpp"
-#include "ARUI/Runtime/RuntimePainter.hpp"
+#include "VISR/Render/RenderGraph.hpp"
+#include "VISR/Render/Renderer.hpp"
+#include "VISR/Render/StandardPipeline.hpp"
+#include "VISR/Runtime/Painters/VisrFlatPainter.hpp"
+#include "VISR/Runtime/RuntimePainter.hpp"
 
 #include <algorithm>
 #include <array>
@@ -16,7 +16,7 @@
 #include <thread>
 #include <vector>
 
-namespace ARUI::Tools::Simulator {
+namespace VISR::Tools::Simulator {
 namespace {
 
 float Meters(const std::optional<Language::Length> &length, float fallback) {
@@ -240,7 +240,7 @@ int SimulatorApplication::Run() {
 
   Render::StandardPipeline standardPipeline{*renderDevice_};
   Runtime::PainterRegistry painters;
-  Runtime::RegisterAruiFlatPainter(painters);
+  Runtime::RegisterVisrFlatPainter(painters);
   using Clock = std::chrono::steady_clock;
   const auto framePeriod = std::chrono::duration_cast<Clock::duration>(
       std::chrono::duration<double>{1.0 / 90.0});
@@ -313,4 +313,4 @@ int SimulatorApplication::Run() {
   return 0;
 }
 
-} // namespace ARUI::Tools::Simulator
+} // namespace VISR::Tools::Simulator

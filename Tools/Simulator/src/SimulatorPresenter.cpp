@@ -1,6 +1,6 @@
-#include "ARUI/Tools/Simulator/SimulatorPresenter.hpp"
-#include "ARUI/Language/Parser.hpp"
-#include "ARUI/Language/Serializer.hpp"
+#include "VISR/Tools/Simulator/SimulatorPresenter.hpp"
+#include "VISR/Language/Parser.hpp"
+#include "VISR/Language/Serializer.hpp"
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -14,8 +14,8 @@
 #include <string>
 
 namespace {
-ARUI::Language::LNode MakeDefaultDocument() {
-  using namespace ARUI;
+VISR::Language::LNode MakeDefaultDocument() {
+  using namespace VISR;
   Language::Style surfaceStyle;
   surfaceStyle.width = Language::Length{1.2, Language::LengthUnit::Meter};
   surfaceStyle.height = Language::Length{0.7, Language::LengthUnit::Meter};
@@ -36,7 +36,7 @@ void GLFWErrorCallback(int error, const char *description) {
 }
 } // namespace
 
-namespace ARUI::Tools::Simulator {
+namespace VISR::Tools::Simulator {
 
 SimulatorPresenter::SimulatorPresenter()
     : SimulatorPresenter(std::make_shared<SimulatorXRTracker>(), nullptr) {
@@ -62,7 +62,7 @@ SimulatorPresenter::SimulatorPresenter(
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-  window = glfwCreateWindow(1920, 1080, "ARUI Simulator", nullptr, nullptr);
+  window = glfwCreateWindow(1920, 1080, "VISR Simulator", nullptr, nullptr);
   if (!window)
     throw std::runtime_error("GLFW failed to create the simulator window");
   glfwMakeContextCurrent(window);
@@ -157,7 +157,7 @@ void SimulatorPresenter::DrawEditorShell() {
       ImGui::MenuItem("Tracking Inspector", nullptr, true, false);
       ImGui::EndMenu();
     }
-    ImGui::TextDisabled("ARUI Simulator");
+    ImGui::TextDisabled("VISR Simulator");
     ImGui::EndMainMenuBar();
   }
 }
@@ -596,7 +596,7 @@ void SimulatorPresenter::RefreshMarkupFromVisualEditor() {
 }
 
 void SimulatorPresenter::ApplyMarkupEditor() {
-  auto parsed = Language::ParseARUI(markupSource_);
+  auto parsed = Language::ParseVISR(markupSource_);
   markupDiagnostics_ = parsed.diagnostics;
   if (!parsed)
     return;
@@ -643,13 +643,13 @@ void SimulatorPresenter::DrawDocumentEditor() {
         ImGui::EndTabItem();
       }
 
-      if (ImGui::BeginTabItem("ARUI Markup")) {
-        ImGui::TextDisabled("Edit the complete document as ARUI markup.");
+      if (ImGui::BeginTabItem("VISR Markup")) {
+        ImGui::TextDisabled("Edit the complete document as VISR markup.");
         ImGui::TextDisabled("Apply with the button or Ctrl+Enter.");
         const float diagnosticsHeight = markupDiagnostics_.empty()
                                             ? ImGui::GetFrameHeightWithSpacing()
                                             : 76.0F;
-        if (ImGui::InputTextMultiline("##ARUIMarkup", &markupSource_,
+        if (ImGui::InputTextMultiline("##VISRMarkup", &markupSource_,
                                       {-1.0F, -diagnosticsHeight},
                                       ImGuiInputTextFlags_AllowTabInput)) {
           markupOutOfSync_ = true;
@@ -771,7 +771,7 @@ void SimulatorPresenter::DrawViewport() {
 
 void SimulatorPresenter::DrawConsole() {
   if (ImGui::Begin("Console")) {
-    ImGui::TextDisabled("ARUI Simulator ready");
+    ImGui::TextDisabled("VISR Simulator ready");
     ImGui::Text("Three simulated views are rendering through OpenGL/EGL.");
   }
   ImGui::End();
@@ -797,4 +797,4 @@ bool SimulatorPresenter::ShouldClose() const {
   return !window || glfwWindowShouldClose(window);
 }
 
-} // namespace ARUI::Tools::Simulator
+} // namespace VISR::Tools::Simulator

@@ -1,9 +1,9 @@
-#include "ARUI/Runtime/Painter/Commons/Layout.hpp"
+#include "VISR/Runtime/Painter/Commons/Layout.hpp"
 
 #include <algorithm>
 #include <cmath>
 
-namespace ARUI::Runtime::PainterCommons {
+namespace VISR::Runtime::PainterCommons {
 namespace {
 
 float ResolveMeters(const Language::Length &value, float reference,
@@ -109,4 +109,4 @@ LayoutNode LayoutTree(const RuntimeTree &tree, NodeID root,
                              defaults.fontSize);
 }
 
-} // namespace ARUI::Runtime::PainterCommons
+} // namespace VISR::Runtime::PainterCommons

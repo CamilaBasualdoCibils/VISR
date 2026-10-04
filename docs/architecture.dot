@@ -1,5 +1,5 @@
-digraph ARUIArchitecture {
-  graph [label="ARUI architecture and frame responsibilities" labelloc=t fontsize=22 rankdir=LR compound=true newrank=true];
+digraph VISRArchitecture {
+  graph [label="VISR architecture and frame responsibilities" labelloc=t fontsize=22 rankdir=LR compound=true newrank=true];
   node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=10 color="#50606e" fillcolor="#f8fafc"];
   edge [fontname="Helvetica" fontsize=9 color="#50606e"];
   subgraph cluster_content {
@@ -51,9 +51,9 @@ digraph ARUIArchitecture {
   }
   subgraph cluster_integration {
     label="Composition roots / implementations"; color="#9b83bd";
-    server [label="Server/Runtime\nlong-lived ARUI service + frame loop" fillcolor="#f0eafa"];
+    server [label="Server/Runtime\nlong-lived VISR service + frame loop" fillcolor="#f0eafa"];
     presentation_rpc [label="Presentation RPC\nIPresentationController endpoint" fillcolor="#f0eafa"];
-    system_experiences [label="AR-OS Boot / Login / Desktop\nOS policy (external)" fillcolor="#f6e8f4"];
+    system_experiences [label="VISR OS Boot / Login / Desktop\nOS policy (external)" fillcolor="#f6e8f4"];
     simulator [label="Tools/Simulator\ndev XR implementations" fillcolor="#f0eafa"];
     openxr [label="XR/OpenXR\nproduction implementation" fillcolor="#f0eafa"];
     system_experiences -> presentation_rpc [label="privileged RPC"];

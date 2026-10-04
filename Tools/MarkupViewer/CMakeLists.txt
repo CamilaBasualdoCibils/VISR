@@ -1,8 +1,8 @@
-add_executable(AruiMarkupViewer src/main.cpp)
-target_link_libraries(AruiMarkupViewer PRIVATE
-    ARUI::Runtime
-    ARUI::RenderOpenGL
+add_executable(VisrMarkupViewer src/main.cpp)
+target_link_libraries(VisrMarkupViewer PRIVATE
+    VISR::Runtime
+    VISR::RenderOpenGL
     imgui::imgui
     glfw
     OpenGL::GL)
-arui_enable_runtime_instrumentation(AruiMarkupViewer)
+visr_enable_runtime_instrumentation(VisrMarkupViewer)

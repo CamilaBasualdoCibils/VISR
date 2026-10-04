@@ -1,7 +1,7 @@
-#include "ARUI/Render/Backends/OpenGL/OpenGLRenderDevice.hpp"
-#include "ARUI/Render/Backends/OpenGL/OpenGLCommandList.hpp"
-#include "ARUI/Render/Backends/OpenGL/OpenGLCommons.hpp"
-#include "ARUI/Render/RenderCommons.hpp"
+#include "VISR/Render/Backends/OpenGL/OpenGLRenderDevice.hpp"
+#include "VISR/Render/Backends/OpenGL/OpenGLCommandList.hpp"
+#include "VISR/Render/Backends/OpenGL/OpenGLCommons.hpp"
+#include "VISR/Render/RenderCommons.hpp"
 #include <unordered_set>
 #include <EGL/eglext.h>
 
@@ -45,7 +45,7 @@ static bool HasExtension(const std::unordered_set<std::string> &extensions,
                          std::string_view name) {
   return extensions.contains(std::string{name});
 }
-ARUI::Render::OpenGLRenderDevice::OpenGLRenderDevice(bool useCurrentContext)
+VISR::Render::OpenGLRenderDevice::OpenGLRenderDevice(bool useCurrentContext)
     : IRenderDevice() {
   EGLContext sharedContext = EGL_NO_CONTEXT;
   if (useCurrentContext) {
@@ -114,7 +114,7 @@ ARUI::Render::OpenGLRenderDevice::OpenGLRenderDevice(bool useCurrentContext)
                reinterpret_cast<const char *>(glGetString(GL_VENDOR)));
 }
 
-ARUI::Render::OpenGLRenderDevice::~OpenGLRenderDevice() {
+VISR::Render::OpenGLRenderDevice::~OpenGLRenderDevice() {
   if (eglDisplay_ == EGL_NO_DISPLAY)
     return;
   if (eglGetCurrentContext() == eglContext_)
@@ -127,7 +127,7 @@ ARUI::Render::OpenGLRenderDevice::~OpenGLRenderDevice() {
     eglTerminate(eglDisplay_);
 }
 
-void ARUI::Render::OpenGLRenderDevice::ActivateContext() const {
+void VISR::Render::OpenGLRenderDevice::ActivateContext() const {
   if (eglGetCurrentContext() == eglContext_)
     return;
   if (eglMakeCurrent(eglDisplay_, eglSurface_, eglSurface_, eglContext_) !=
@@ -135,8 +135,8 @@ void ARUI::Render::OpenGLRenderDevice::ActivateContext() const {
     throw std::runtime_error(
         "Failed to activate the render-device EGL context");
 }
-ARUI::Render::ImageHandle
-ARUI::Render::OpenGLRenderDevice::CreateImage(const ImageDesc &desc) {
+VISR::Render::ImageHandle
+VISR::Render::OpenGLRenderDevice::CreateImage(const ImageDesc &desc) {
   ActivateContext();
   GLTexture glTexture;
   switch (desc.type) {
@@ -180,8 +180,8 @@ ARUI::Render::OpenGLRenderDevice::CreateImage(const ImageDesc &desc) {
   }
   return ImageHandle(-1);
 }
-ARUI::Render::BufferHandle
-ARUI::Render::OpenGLRenderDevice::CreateBuffer(const BufferDesc &desc) {
+VISR::Render::BufferHandle
+VISR::Render::OpenGLRenderDevice::CreateBuffer(const BufferDesc &desc) {
   ActivateContext();
   GLBuffer glBuffer;
   glCreateBuffers(1, &glBuffer.id);
@@ -194,8 +194,8 @@ ARUI::Render::OpenGLRenderDevice::CreateBuffer(const BufferDesc &desc) {
   buffers[handle] = glBuffer;
   return handle;
 }
-ARUI::Render::GraphicsPipelineHandle
-ARUI::Render::OpenGLRenderDevice::CreatePipeline(
+VISR::Render::GraphicsPipelineHandle
+VISR::Render::OpenGLRenderDevice::CreatePipeline(
     const GraphicsPipelineDesc &graphicsDesc) {
   ActivateContext();
   GLuint program = glCreateProgram();
@@ -249,8 +249,8 @@ ARUI::Render::OpenGLRenderDevice::CreatePipeline(
   pipelines[handle] = glPipeline;
   return handle;
 }
-ARUI::Render::ShaderModuleHandle
-ARUI::Render::OpenGLRenderDevice::CreateShaderModule(
+VISR::Render::ShaderModuleHandle
+VISR::Render::OpenGLRenderDevice::CreateShaderModule(
     const ShaderModuleDesc &desc) {
   ActivateContext();
   const auto glShaderType = OpenGL::GetGLShaderStage(desc.stage);
@@ -289,34 +289,34 @@ ARUI::Render::OpenGLRenderDevice::CreateShaderModule(
 
   return handle;
 }
-void ARUI::Render::OpenGLRenderDevice::Destroy(GraphicsPipelineHandle handle) {
+void VISR::Render::OpenGLRenderDevice::Destroy(GraphicsPipelineHandle handle) {
   ActivateContext();
 
   glDeleteProgram(pipelines[handle].programId);
   glDeleteVertexArrays(1, &pipelines[handle].vaoId);
   pipelines.erase(handle);
 }
-void ARUI::Render::OpenGLRenderDevice::Destroy(ShaderModuleHandle handle) {
+void VISR::Render::OpenGLRenderDevice::Destroy(ShaderModuleHandle handle) {
   ActivateContext();
 
   glDeleteShader(shaderModules[handle].id);
   shaderModules.erase(handle);
 }
-void ARUI::Render::OpenGLRenderDevice::Destroy(ImageHandle handle) {
+void VISR::Render::OpenGLRenderDevice::Destroy(ImageHandle handle) {
   ActivateContext();
   glDeleteTextures(1, &textures[handle].id);
   textures.erase(handle);
 }
-void ARUI::Render::OpenGLRenderDevice::Destroy(BufferHandle handle) {
+void VISR::Render::OpenGLRenderDevice::Destroy(BufferHandle handle) {
   ActivateContext();
   glDeleteBuffers(1, &buffers.at(handle).id);
   buffers.erase(handle);
 }
-std::unique_ptr<ARUI::Render::IRenderCommandList>
-ARUI::Render::OpenGLRenderDevice::CreateCommandList(QueueType type) {
+std::unique_ptr<VISR::Render::IRenderCommandList>
+VISR::Render::OpenGLRenderDevice::CreateCommandList(QueueType type) {
   return std::make_unique<OpenGLCommandList>(this);
 }
-void ARUI::Render::OpenGLRenderDevice::Submit(
+void VISR::Render::OpenGLRenderDevice::Submit(
     const IRenderCommandList &commandList) {
 #if defined(TRACY_ENABLE)
   ZoneScopedN("OpenGL Command Submission");
@@ -333,8 +333,8 @@ void ARUI::Render::OpenGLRenderDevice::Submit(
 #endif
 }
 
-ARUI::Render::RenderCapabilities
-ARUI::Render::OpenGLRenderDevice::GetGLCapabilities() {
+VISR::Render::RenderCapabilities
+VISR::Render::OpenGLRenderDevice::GetGLCapabilities() {
   const auto extensions = GetGLExtensions();
 
   RenderCapabilities caps{};

@@ -1,9 +1,9 @@
-#include "ARUI/XR/OpenXR/OpenXRPresenter.hpp"
-#include "ARUI/XR/OpenXR/IOpenXRGraphicsBinding.hpp"
-#include "ARUI/XR/OpenXR/OpenXRTrackingProvider.hpp"
+#include "VISR/XR/OpenXR/OpenXRPresenter.hpp"
+#include "VISR/XR/OpenXR/IOpenXRGraphicsBinding.hpp"
+#include "VISR/XR/OpenXR/OpenXRTrackingProvider.hpp"
 #include <stdexcept>
 
-namespace ARUI::OpenXR {
+namespace VISR::OpenXR {
 OpenXRPresenter::OpenXRPresenter(
     std::shared_ptr<IOpenXRGraphicsBinding> graphics)
     : graphics_(std::move(graphics)) {
@@ -34,4 +34,4 @@ void OpenXRPresenter::EndFrame() {
 }
 std::vector<std::string>
 OpenXRPresenter::GetRequiredVulkanExtensions() const { return {}; }
-} // namespace ARUI::OpenXR
+} // namespace VISR::OpenXR

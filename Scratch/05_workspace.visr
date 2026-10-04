@@ -1,0 +1,239 @@
+<visr>
+    <style>
+    .hud-content {
+        width: fit-content;
+        height: fit-content;
+
+        padding: 5mm;
+        gap: 1cm;
+
+        align-self: center;
+
+        painter: glass;
+    }
+
+
+    .workspace {
+        padding: 1cm;
+        gap: 1cm;
+
+        painter: glass;
+    }
+
+
+    .forearm-content {
+        width: fit-content;
+        height: fit-content;
+
+        padding: 5mm;
+        gap: 4mm;
+
+        align-self: center;
+
+        painter: glass;
+    }
+
+
+    .title {
+        font-size: 12mm;
+    }
+
+    .status {
+        font-size: 6mm;
+    }
+
+
+    .control {
+        width: fit-content;
+        height: fit-content;
+
+        padding: 5mm;
+
+        painter: glass;
+    }
+
+
+    .focused {
+        painter: highlight;
+    }
+
+
+    .terminal {
+        padding: 5mm;
+        painter: terminal;
+    }
+    </style>
+
+
+    <script type="module">
+    function gazeHighlight(node) {
+        if (eye.isOver(node))
+            node.addClass("focused");
+        else
+            node.removeClass("focused");
+    }
+
+
+    export function build(node) {
+        gazeHighlight(node);
+
+        if (hand.isTouching(node))
+            app.invoke("build");
+    }
+
+
+    export function run(node) {
+        gazeHighlight(node);
+
+        if (hand.isTouching(node))
+            app.invoke("run");
+    }
+
+
+    export function debug(node) {
+        gazeHighlight(node);
+
+        if (hand.isTouching(node))
+            app.invoke("debug");
+    }
+
+
+    export function openTerminal(node) {
+        gazeHighlight(node);
+
+        if (hand.isTouching(node))
+            app.invoke("openTerminal");
+    }
+    </script>
+
+
+
+    <!-- =========================================================
+     HEAD-RELATIVE STATUS SURFACE
+     ========================================================= -->
+
+    <surface width="60cm" height="15cm" anchor="head">
+
+        <panel class="hud-content">
+
+            <row>
+                <text>VISR</text>
+
+                <text state="system.time" />
+
+                <text state="system.battery" />
+
+                <text state="network.status" />
+            </row>
+
+        </panel>
+
+    </surface>
+
+
+
+    <!-- =========================================================
+     WORLD-SPACE DEVELOPMENT SURFACE
+     ========================================================= -->
+
+    <surface width="80cm" height="50cm" anchor="world">
+
+        <column class="workspace">
+
+            <row>
+                <text class="title">Development</text>
+                <text class="status" state="project.status" />
+            </row>
+
+
+            <row>
+
+                <panel class="terminal">
+
+                    <column>
+                        <text>Terminal</text>
+                        <text state="terminal.output" />
+                    </column>
+
+                </panel>
+
+
+                <panel>
+
+                    <column>
+
+                        <text>System</text>
+
+                        <row>
+                            <text>CPU</text>
+                            <text state="system.cpu" />
+                        </row>
+
+                        <row>
+                            <text>Memory</text>
+                            <text state="system.memory" />
+                        </row>
+
+                        <row>
+                            <text>GPU</text>
+                            <text state="system.gpu" />
+                        </row>
+
+                    </column>
+
+                </panel>
+
+            </row>
+
+
+            <row>
+
+                <panel class="control" behavior="build">
+                    <text>Build</text>
+                </panel>
+
+                <panel class="control" behavior="run">
+                    <text>Run</text>
+                </panel>
+
+                <panel class="control" behavior="debug">
+                    <text>Debug</text>
+                </panel>
+
+            </row>
+
+        </column>
+
+    </surface>
+
+
+
+    <!-- =========================================================
+     FOREARM SURFACE
+     ========================================================= -->
+
+    <surface width="18cm" height="28cm" anchor="left-forearm">
+
+        <panel class="forearm-content">
+
+            <column>
+
+                <text>Quick Controls</text>
+
+                <panel class="control" behavior="openTerminal">
+                    <text>Terminal</text>
+                </panel>
+
+                <row>
+                    <text>Volume</text>
+                    <text state="system.volume" />
+                </row>
+
+                <text state="notifications.latest" />
+
+            </column>
+
+        </panel>
+
+    </surface>
+</visr>

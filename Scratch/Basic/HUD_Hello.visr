@@ -1,0 +1,14 @@
+<visr>
+ <style>
+    .red-panel {
+        fill: #ff000080;
+        padding: 1cm;
+        font-size: 5cm;
+    }
+    </style>
+    <surface width="20cm" height="10cm" anchor = "head" z-offset="-50cm">
+    <panel class="red-panel">
+        <text>Hello, VISR!</text>
+    </panel>
+    </surface>
+</visr>

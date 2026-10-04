@@ -1,4 +1,4 @@
-#include "ARUI/Render/Font.hpp"
+#include "VISR/Render/Font.hpp"
 
 #include <algorithm>
 #include <cstdlib>
@@ -8,11 +8,11 @@
 #include <stdexcept>
 #include <string>
 
-#ifndef ARUI_DEFAULT_FONT_PATH
-#define ARUI_DEFAULT_FONT_PATH ""
+#ifndef VISR_DEFAULT_FONT_PATH
+#define VISR_DEFAULT_FONT_PATH ""
 #endif
 
-namespace ARUI::Render {
+namespace VISR::Render {
 namespace {
 struct LibraryDeleter {
   void operator()(FT_LibraryRec_ *library) const {
@@ -51,10 +51,10 @@ std::vector<FT_ULong> DecodeUtf8(std::string_view text) {
 } // namespace
 
 std::filesystem::path DefaultFontFile() {
-  if (const char *configured = std::getenv("ARUI_FONT_PATH");
+  if (const char *configured = std::getenv("VISR_FONT_PATH");
       configured && *configured)
     return std::filesystem::path{configured};
-  return std::filesystem::path{ARUI_DEFAULT_FONT_PATH};
+  return std::filesystem::path{VISR_DEFAULT_FONT_PATH};
 }
 
 RasterizedText RasterizeText(std::string_view text,
@@ -109,4 +109,4 @@ RasterizedText RasterizeText(std::string_view text,
   return result;
 }
 
-} // namespace ARUI::Render
+} // namespace VISR::Render

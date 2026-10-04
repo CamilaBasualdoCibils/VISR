@@ -1,9 +1,9 @@
-#include "ARUI/Language/Style.hpp"
+#include "VISR/Language/Style.hpp"
 
 #include <algorithm>
 #include <type_traits>
 
-namespace ARUI::Language {
+namespace VISR::Language {
 
 const PainterStylePropertyDescriptor *
 PainterStyleSchema::Find(std::string_view name) const noexcept {
@@ -44,4 +44,4 @@ PainterStyleType TypeOf(const PainterStyleValue &value) noexcept {
       value);
 }
 
-} // namespace ARUI::Language
+} // namespace VISR::Language

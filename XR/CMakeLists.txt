@@ -3,10 +3,10 @@ add_subdirectory(Tracking)
 add_subdirectory(Environment)
 add_subdirectory(OpenXR)
 
-add_library(ARUIXR INTERFACE)
-add_library(ARUI::XR ALIAS ARUIXR)
-target_link_libraries(ARUIXR INTERFACE
-    ARUI::XRDisplay
-    ARUI::XRTracking
-    ARUI::XREnvironment
-    ARUI::OpenXR)
+add_library(VISRXR INTERFACE)
+add_library(VISR::XR ALIAS VISRXR)
+target_link_libraries(VISRXR INTERFACE
+    VISR::XRDisplay
+    VISR::XRTracking
+    VISR::XREnvironment
+    VISR::OpenXR)

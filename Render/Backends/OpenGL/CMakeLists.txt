@@ -1,3 +1,3 @@
-add_library(ARUIRenderOpenGL STATIC OpenGLCommandList.cpp OpenGLRenderDevice.cpp)
-add_library(ARUI::RenderOpenGL ALIAS ARUIRenderOpenGL)
-target_link_libraries(ARUIRenderOpenGL PUBLIC ARUI::Render ARUI::Instrumentation GLEW::GLEW OpenGL::EGL spdlog::spdlog)
+add_library(VISRRenderOpenGL STATIC OpenGLCommandList.cpp OpenGLRenderDevice.cpp)
+add_library(VISR::RenderOpenGL ALIAS VISRRenderOpenGL)
+target_link_libraries(VISRRenderOpenGL PUBLIC VISR::Render VISR::Instrumentation GLEW::GLEW OpenGL::EGL spdlog::spdlog)

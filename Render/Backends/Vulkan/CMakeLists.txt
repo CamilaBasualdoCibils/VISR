@@ -1,3 +1,3 @@
-add_library(ARUIRenderVulkan STATIC VulkanRenderDevice.cpp)
-add_library(ARUI::RenderVulkan ALIAS ARUIRenderVulkan)
-target_link_libraries(ARUIRenderVulkan PUBLIC ARUI::Render ARUI::XR spdlog::spdlog)
+add_library(VISRRenderVulkan STATIC VulkanRenderDevice.cpp)
+add_library(VISR::RenderVulkan ALIAS VISRRenderVulkan)
+target_link_libraries(VISRRenderVulkan PUBLIC VISR::Render VISR::XR spdlog::spdlog)

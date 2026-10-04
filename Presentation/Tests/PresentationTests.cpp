@@ -1,11 +1,11 @@
-#include "ARUI/Language/node.hpp"
-#include "ARUI/Presentation/PresentationRpcServer.hpp"
-#include "ARUI/Presentation/RpcPresentationController.hpp"
-#include "ARUI/Presentation/RuntimePresentationController.hpp"
-#include "ARUI/Runtime/RuntimeTree.hpp"
+#include "VISR/Language/node.hpp"
+#include "VISR/Presentation/PresentationRpcServer.hpp"
+#include "VISR/Presentation/RpcPresentationController.hpp"
+#include "VISR/Presentation/RuntimePresentationController.hpp"
+#include "VISR/Runtime/RuntimeTree.hpp"
 #include <gtest/gtest.h>
 #include <mutex>
-using namespace ARUI;
+using namespace VISR;
 TEST(PresentationRpc, ControlsActiveLanguageTree) {
   Runtime::RuntimeTree runtime; std::mutex mutex;
   Presentation::RuntimePresentationController service(runtime, mutex);

@@ -1,9 +1,9 @@
-#include "ARUI/Render/Renderer.hpp"
-#include "ARUI/Render/Font.hpp"
+#include "VISR/Render/Renderer.hpp"
+#include "VISR/Render/Font.hpp"
 
-#include "ARUI/Render/IRenderCommandList.hpp"
-#include "ARUI/Render/IRenderDevice.hpp"
-#include "ARUI/Render/RenderGraph.hpp"
+#include "VISR/Render/IRenderCommandList.hpp"
+#include "VISR/Render/IRenderDevice.hpp"
+#include "VISR/Render/RenderGraph.hpp"
 
 #include <algorithm>
 #include <array>
@@ -14,7 +14,7 @@
 #include <utility>
 #include <vector>
 
-namespace ARUI::Render {
+namespace VISR::Render {
 namespace {
 
 struct RenderPassData {
@@ -227,7 +227,7 @@ void Renderer::BuildRenderGraph(RenderGraph &graph) {
                            .expectedDevice = &device_};
 
   graph.addPass<RenderPassData>(
-      "ARUI high-level primitives",
+      "VISR high-level primitives",
       [submitted = std::move(submitted)](RenderGraph::Builder &builder,
                                          RenderPassData &data) mutable {
         data = std::move(submitted);
@@ -359,4 +359,4 @@ RendererSubmissionCounts Renderer::SubmissionCounts() const noexcept {
           .meshes = meshes_.size()};
 }
 
-} // namespace ARUI::Render
+} // namespace VISR::Render

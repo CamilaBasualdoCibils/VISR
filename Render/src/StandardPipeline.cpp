@@ -1,16 +1,16 @@
-#include "ARUI/Render/StandardPipeline.hpp"
+#include "VISR/Render/StandardPipeline.hpp"
 #include "ShaderRegistry.hpp"
 #include <glm/ext/vector_float4.hpp>
 #include <span>
 
-namespace ARUI::Render {
+namespace VISR::Render {
 StandardPipeline::StandardPipeline(IRenderDevice &device,
                                    ImageFormat colorFormat)
     : device_(&device) {
-  const auto &geometryVertex = ARUI::Shaders::OpenGL::GetShader("test.vert");
-  const auto &geometryFragment = ARUI::Shaders::OpenGL::GetShader("test.frag");
-  const auto &textVertex = ARUI::Shaders::OpenGL::GetShader("text.vert");
-  const auto &textFragment = ARUI::Shaders::OpenGL::GetShader("text.frag");
+  const auto &geometryVertex = VISR::Shaders::OpenGL::GetShader("test.vert");
+  const auto &geometryFragment = VISR::Shaders::OpenGL::GetShader("test.frag");
+  const auto &textVertex = VISR::Shaders::OpenGL::GetShader("text.vert");
+  const auto &textFragment = VISR::Shaders::OpenGL::GetShader("text.frag");
   geometryVertex_ =
       device.CreateShaderModule({.stage = ShaderStageFlags::Vertex,
                                  .spirv = std::as_bytes(geometryVertex.spirv)});
@@ -72,4 +72,4 @@ StandardPipeline::Configuration(RenderPassDesc renderPass,
           .renderPass = std::move(renderPass),
           .worldToClip = worldToClip};
 }
-} // namespace ARUI::Render
+} // namespace VISR::Render

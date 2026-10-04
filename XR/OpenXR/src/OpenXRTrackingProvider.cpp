@@ -1,5 +1,5 @@
-#include "ARUI/XR/OpenXR/OpenXRTrackingProvider.hpp"
-#include "ARUI/XR/OpenXR/IOpenXRGraphicsBinding.hpp"
+#include "VISR/XR/OpenXR/OpenXRTrackingProvider.hpp"
+#include "VISR/XR/OpenXR/IOpenXRGraphicsBinding.hpp"
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace ARUI::OpenXR {
+namespace VISR::OpenXR {
 namespace {
 constexpr std::array<std::string_view, 3> jointNames = {"head", "left_hand",
                                                         "right_hand"};
@@ -282,9 +282,9 @@ bool OpenXRTrackingProvider::Initialize() {
   if (depthExtension)
     enabledExtensions.push_back(XR_META_ENVIRONMENT_DEPTH_EXTENSION_NAME);
   XrInstanceCreateInfo instanceInfo{XR_TYPE_INSTANCE_CREATE_INFO};
-  std::strncpy(instanceInfo.applicationInfo.applicationName, "ARUI Server",
+  std::strncpy(instanceInfo.applicationInfo.applicationName, "VISR Server",
                XR_MAX_APPLICATION_NAME_SIZE - 1);
-  std::strncpy(instanceInfo.applicationInfo.engineName, "ARUI",
+  std::strncpy(instanceInfo.applicationInfo.engineName, "VISR",
                XR_MAX_ENGINE_NAME_SIZE - 1);
   instanceInfo.applicationInfo.apiVersion = XR_API_VERSION_1_0;
   instanceInfo.enabledExtensionCount = std::size(enabledExtensions);
@@ -571,7 +571,7 @@ bool OpenXRTrackingProvider::Initialize() {
   XrActionSetCreateInfo actionSetInfo{XR_TYPE_ACTION_SET_CREATE_INFO};
   std::strncpy(actionSetInfo.actionSetName, "simulator_tracking",
                XR_MAX_ACTION_SET_NAME_SIZE - 1);
-  std::strncpy(actionSetInfo.localizedActionSetName, "ARUI Tracking",
+  std::strncpy(actionSetInfo.localizedActionSetName, "VISR Tracking",
                XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE - 1);
   if (xrCreateActionSet(state_->instance, &actionSetInfo, &state_->actionSet) !=
       XR_SUCCESS)
@@ -1077,4 +1077,4 @@ void OpenXRTrackingProvider::PresentFrame(
   state_->depthFrame.reset();
 }
 
-} // namespace ARUI::OpenXR
+} // namespace VISR::OpenXR

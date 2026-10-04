@@ -2,11 +2,11 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 
-add_executable(AruiManualPresenter src/main.cpp)
-target_link_libraries(AruiManualPresenter PRIVATE
-    ARUI::Language
-    ARUI::Presentation
+add_executable(VisrManualPresenter src/main.cpp)
+target_link_libraries(VisrManualPresenter PRIVATE
+    VISR::Language
+    VISR::Presentation
     glfw
     imgui::imgui
     OpenGL::GL)
-arui_enable_runtime_instrumentation(AruiManualPresenter)
+visr_enable_runtime_instrumentation(VisrManualPresenter)

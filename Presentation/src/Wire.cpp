@@ -1,15 +1,15 @@
 #include "Wire.hpp"
 
-#include "ARUI/Language/Color.hpp"
+#include "VISR/Language/Color.hpp"
 
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <type_traits>
 
-namespace ARUI::Presentation::Wire {
+namespace VISR::Presentation::Wire {
 namespace {
 using Json = nlohmann::json;
-using namespace ARUI::Language;
+using namespace VISR::Language;
 
 Json EncodeLength(const Length &value) {
   return {{"value", value.value}, {"unit", static_cast<int>(value.unit)}};
@@ -80,7 +80,7 @@ AttributeValue DecodeAttribute(const Json &attribute) {
   case 7:
     return ActionReference{value.get<std::string>()};
   default:
-    throw std::invalid_argument("unknown ARUI attribute wire type");
+    throw std::invalid_argument("unknown VISR attribute wire type");
   }
 }
 
@@ -119,7 +119,7 @@ PainterStyleValue DecodePainterValue(const Json &property) {
   case 6:
     return DecodeColor(value);
   default:
-    throw std::invalid_argument("unknown ARUI painter-property wire type");
+    throw std::invalid_argument("unknown VISR painter-property wire type");
   }
 }
 
@@ -220,4 +220,4 @@ std::string EncodeStyle(const Language::Style &style) {
 Language::Style DecodeStyle(std::string_view json) {
   return DecodeStyleJson(Json::parse(json));
 }
-} // namespace ARUI::Presentation::Wire
+} // namespace VISR::Presentation::Wire

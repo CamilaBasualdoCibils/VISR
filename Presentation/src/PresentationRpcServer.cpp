@@ -1,4 +1,4 @@
-#include "ARUI/Presentation/PresentationRpcServer.hpp"
+#include "VISR/Presentation/PresentationRpcServer.hpp"
 
 #include "Wire.hpp"
 
@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-namespace ARUI::Presentation {
+namespace VISR::Presentation {
 class PresentationRpcServer::Impl {
 public:
   Impl(IPresentationController &controller, std::uint16_t port)
@@ -35,4 +35,4 @@ void PresentationRpcServer::Stop() {
   if (impl_)
     impl_->server.stop();
 }
-} // namespace ARUI::Presentation
+} // namespace VISR::Presentation

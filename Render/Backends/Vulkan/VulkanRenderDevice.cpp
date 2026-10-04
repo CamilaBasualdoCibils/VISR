@@ -1,5 +1,5 @@
-#include "ARUI/Render/Backends/Vulkan/VulkanRenderDevice.hpp"
-#include "ARUI/XR/Display/IPresenter.hpp"
+#include "VISR/Render/Backends/Vulkan/VulkanRenderDevice.hpp"
+#include "VISR/XR/Display/IPresenter.hpp"
 #include "vulkan/vulkan.hpp"
 #include <spdlog/common.h>
 #include <unordered_set>
@@ -13,7 +13,7 @@ static bool FindExtension(const char *extensionName,
   }
   return false;
 }
-ARUI::Render::VulkanRenderDevice::VulkanRenderDevice(
+VISR::Render::VulkanRenderDevice::VulkanRenderDevice(
     std::shared_ptr<IPresenter> presenter) 
 {
 
@@ -42,7 +42,7 @@ ARUI::Render::VulkanRenderDevice::VulkanRenderDevice(
   appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
   appInfo.apiVersion = VK_API_VERSION_1_4;
   appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-  appInfo.pEngineName = "ARUI Engine";
+  appInfo.pEngineName = "VISR Engine";
 
   vk::InstanceCreateInfo createInfo{};
   createInfo.pApplicationInfo = &appInfo;

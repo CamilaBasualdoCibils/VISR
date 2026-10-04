@@ -1,6 +1,6 @@
-#include "ARUI/Runtime/RuntimePainter.hpp"
+#include "VISR/Runtime/RuntimePainter.hpp"
 
-namespace ARUI::Runtime {
+namespace VISR::Runtime {
 
 void PaintRuntimeSurface(PaintContext &context, const PainterRegistry &painters,
                          const RuntimeTree &runtime, NodeID surfaceID,
@@ -35,4 +35,4 @@ void PaintRuntimeSurface(PaintContext &context, const PainterRegistry &painters,
                  surface->style.painterProperties);
 }
 
-} // namespace ARUI::Runtime
+} // namespace VISR::Runtime

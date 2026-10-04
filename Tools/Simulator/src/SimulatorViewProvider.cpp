@@ -1,9 +1,9 @@
-#include "ARUI/Tools/Simulator/SimulatorViewProvider.hpp"
+#include "VISR/Tools/Simulator/SimulatorViewProvider.hpp"
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 
-namespace ARUI::Tools::Simulator {
+namespace VISR::Tools::Simulator {
 namespace {
 constexpr glm::ivec2 viewportSize{1832, 1920};
 constexpr float eyeOffset = 0.032F;
@@ -35,4 +35,4 @@ void SimulatorViewProvider::BeginFrame() {
   views_[2] = tracker_->GetEyeView(1).value_or(MakeView("Right Eye", rightEye));
 }
 
-} // namespace ARUI::Tools::Simulator
+} // namespace VISR::Tools::Simulator

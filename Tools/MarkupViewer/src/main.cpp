@@ -1,11 +1,11 @@
-#include "ARUI/Language/Parser.hpp"
-#include "ARUI/Render/Backends/OpenGL/OpenGLRenderDevice.hpp"
-#include "ARUI/Render/RenderGraph.hpp"
-#include "ARUI/Render/Renderer.hpp"
-#include "ARUI/Render/StandardPipeline.hpp"
-#include "ARUI/Runtime/IPainter.hpp"
-#include "ARUI/Runtime/RuntimePainter.hpp"
-#include "ARUI/Runtime/RuntimeTree.hpp"
+#include "VISR/Language/Parser.hpp"
+#include "VISR/Render/Backends/OpenGL/OpenGLRenderDevice.hpp"
+#include "VISR/Render/RenderGraph.hpp"
+#include "VISR/Render/Renderer.hpp"
+#include "VISR/Render/StandardPipeline.hpp"
+#include "VISR/Runtime/IPainter.hpp"
+#include "VISR/Runtime/RuntimePainter.hpp"
+#include "VISR/Runtime/RuntimeTree.hpp"
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -32,16 +32,16 @@
 
 namespace {
 
-using ARUI::Language::LNodeType;
-using ARUI::Runtime::NodeID;
-using ARUI::Runtime::RNode;
-using ARUI::Runtime::RuntimeTree;
+using VISR::Language::LNodeType;
+using VISR::Runtime::NodeID;
+using VISR::Runtime::RNode;
+using VISR::Runtime::RuntimeTree;
 
-constexpr std::string_view DefaultMarkup = R"(<arui>
+constexpr std::string_view DefaultMarkup = R"(<visr>
   <surface width="20cm" height="10cm">
-    <text>Hello, ARUI!</text>
+    <text>Hello, VISR!</text>
   </surface>
-</arui>)";
+</visr>)";
 constexpr glm::uvec2 RenderExtent{1280, 720};
 
 class MarkupViewer {
@@ -58,7 +58,7 @@ public:
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     window_ =
-        glfwCreateWindow(1440, 900, "ARUI Markup Viewer", nullptr, nullptr);
+        glfwCreateWindow(1440, 900, "VISR Markup Viewer", nullptr, nullptr);
     if (!window_)
       throw std::runtime_error("GLFW failed to create the markup viewer");
     glfwSetWindowUserPointer(window_, this);
@@ -157,7 +157,7 @@ private:
     while (!error && iterator != end) {
       const auto &entry = *iterator;
       if (entry.is_regular_file(error) && !error &&
-          entry.path().extension() == ".arui")
+          entry.path().extension() == ".visr")
         files_.push_back(entry.path());
       iterator.increment(error);
     }
@@ -204,20 +204,20 @@ private:
   }
 
   void CreateRenderResources() {
-    renderDevice_ = std::make_unique<ARUI::Render::OpenGLRenderDevice>(true);
+    renderDevice_ = std::make_unique<VISR::Render::OpenGLRenderDevice>(true);
     previewImage_ = renderDevice_->CreateImage(
         {.extent = {RenderExtent.x, RenderExtent.y, 1},
-         .format = ARUI::Render::ImageFormat::R8G8B8A8_UNORM,
-         .usage = static_cast<ARUI::Render::ImageUsage>(
-                      ARUI::Render::ImageUsageFlags::ColorAttachment) |
-                  static_cast<ARUI::Render::ImageUsage>(
-                      ARUI::Render::ImageUsageFlags::Sampled)});
+         .format = VISR::Render::ImageFormat::R8G8B8A8_UNORM,
+         .usage = static_cast<VISR::Render::ImageUsage>(
+                      VISR::Render::ImageUsageFlags::ColorAttachment) |
+                  static_cast<VISR::Render::ImageUsage>(
+                      VISR::Render::ImageUsageFlags::Sampled)});
     previewView_ = renderDevice_->CreateImageView(
         {.image = previewImage_,
-         .format = ARUI::Render::ImageFormat::R8G8B8A8_UNORM});
+         .format = VISR::Render::ImageFormat::R8G8B8A8_UNORM});
 
     standardPipeline_ =
-        std::make_unique<ARUI::Render::StandardPipeline>(*renderDevice_);
+        std::make_unique<VISR::Render::StandardPipeline>(*renderDevice_);
   }
 
   void DestroyRenderResources() {
@@ -232,24 +232,24 @@ private:
 
   void RenderPreview() {
     renderDevice_->MakeCurrent();
-    ARUI::Render::Renderer renderer(
+    VISR::Render::Renderer renderer(
         *renderDevice_, standardPipeline_->Configuration(
                             {.colorAttachment = previewView_,
                              .clearColor = true,
                              .clearColorValue = {0.055F, 0.065F, 0.08F, 1.0F},
                              .extent = RenderExtent,
                              .offset = {0, 0}}));
-    ARUI::Render::RenderGraph graph;
+    VISR::Render::RenderGraph graph;
     renderer.BeginFrame();
-    ARUI::Runtime::PaintContext paintContext{renderer};
+    VISR::Runtime::PaintContext paintContext{renderer};
     for (const NodeID root : runtime_.RootChildren()) {
       /*  const auto *surface = runtime_.Get(root);
        const float surfaceWidth =
-           surface ? surface->style.width.As(ARUI::Language::LengthUnit::Meter)
+           surface ? surface->style.width.As(VISR::Language::LengthUnit::Meter)
                          .Value()
                    : 0.0F;
        const float surfaceHeight =
-           surface ? surface->style.height.As(ARUI::Language::LengthUnit::Meter)
+           surface ? surface->style.height.As(VISR::Language::LengthUnit::Meter)
                          .Value()
                    : 0.0F;
        if (surfaceWidth <= 0.0F || surfaceHeight <= 0.0F)
@@ -262,15 +262,15 @@ private:
            2.0F * pixelsPerMeter / static_cast<float>(RenderExtent.y)};
        const glm::mat4 localToClip =
            glm::scale(glm::mat4{1.0F}, {metersToNdc.x, metersToNdc.y, 1.0F});
-       ARUI::Runtime::PaintRuntimeSurface(
+       VISR::Runtime::PaintRuntimeSurface(
            paintContext, painters_, runtime_, root,
            {.localToClip = localToClip, .pixelsPerMeter = pixelsPerMeter}); */
       const auto *surface = runtime_.Get(root);
       const glm::vec2 surfaceSizeMeter{
-          surface ? surface->style.width.As(ARUI::Language::LengthUnit::Meter)
+          surface ? surface->style.width.As(VISR::Language::LengthUnit::Meter)
                         .Value()
                   : 0.0F,
-          surface ? surface->style.height.As(ARUI::Language::LengthUnit::Meter)
+          surface ? surface->style.height.As(VISR::Language::LengthUnit::Meter)
                         .Value()
                   : 0.0F};
       if (glm::any(glm::lessThanEqual(surfaceSizeMeter, glm::vec2{0.0F})))
@@ -285,7 +285,7 @@ private:
   }
 
   void ParseAndSubmit() {
-    const auto parsed = ARUI::Language::ParseMarkup(source_);
+    const auto parsed = VISR::Language::ParseMarkup(source_);
     if (!parsed) {
       const auto &diagnostic = parsed.diagnostics.front();
       status_ = "Line " + std::to_string(diagnostic.line) + ", column " +
@@ -317,7 +317,7 @@ private:
     const float editorWidth =
         std::max(340.0F, ImGui::GetContentRegionAvail().x * 0.36F);
     ImGui::BeginChild("Source", {editorWidth, 0.0F}, true);
-    ImGui::TextUnformatted("ARUI XML");
+    ImGui::TextUnformatted("VISR XML");
     ImGui::SetNextItemWidth(-80.0F);
     const bool folderSubmitted = ImGui::InputText(
         "##Folder", &folderInput_, ImGuiInputTextFlags_EnterReturnsTrue);
@@ -325,7 +325,7 @@ private:
     if (ImGui::Button("Scan") || folderSubmitted)
       ScanFolder();
     if (files_.empty()) {
-      ImGui::TextDisabled("Enter or drop a folder containing .arui files");
+      ImGui::TextDisabled("Enter or drop a folder containing .visr files");
     } else {
       const bool filesVisible =
           ImGui::BeginChild("Files", {-1.0F, 125.0F}, true);
@@ -339,7 +339,7 @@ private:
       ImGui::EndChild();
     }
     if (sourcePath_.empty())
-      ImGui::TextDisabled("Drop an ARUI file anywhere in this window");
+      ImGui::TextDisabled("Drop an VISR file anywhere in this window");
     else
       ImGui::TextDisabled("%s", sourcePath_.string().c_str());
     ImGui::BeginDisabled(sourcePath_.empty());
@@ -381,7 +381,7 @@ private:
 
   GLFWwindow *window_{};
   RuntimeTree runtime_;
-  ARUI::Runtime::PainterRegistry painters_;
+  VISR::Runtime::PainterRegistry painters_;
   std::string source_;
   std::string status_;
   std::filesystem::path sourcePath_;
@@ -392,10 +392,10 @@ private:
   bool valid_{};
   bool liveReload_{};
 
-  std::unique_ptr<ARUI::Render::OpenGLRenderDevice> renderDevice_;
-  ARUI::Render::ImageHandle previewImage_;
-  ARUI::Render::ImageViewHandle previewView_;
-  std::unique_ptr<ARUI::Render::StandardPipeline> standardPipeline_;
+  std::unique_ptr<VISR::Render::OpenGLRenderDevice> renderDevice_;
+  VISR::Render::ImageHandle previewImage_;
+  VISR::Render::ImageViewHandle previewView_;
+  std::unique_ptr<VISR::Render::StandardPipeline> standardPipeline_;
 };
 
 } // namespace

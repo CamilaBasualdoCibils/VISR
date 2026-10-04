@@ -1,10 +1,10 @@
-#include "ARUI/Runtime/Painter/Commons/Layout.hpp"
-#include "ARUI/Runtime/Painters/AruiFlatPainter.hpp"
+#include "VISR/Runtime/Painter/Commons/Layout.hpp"
+#include "VISR/Runtime/Painters/VisrFlatPainter.hpp"
 
 #include <glm/ext/matrix_transform.hpp>
 #include <gtest/gtest.h>
 
-using namespace ARUI;
+using namespace VISR;
 
 namespace {
 
@@ -141,7 +141,7 @@ TEST(PainterCommonsLayout, HandlesEmptyInvisibleAndNonPositiveAreasSafely) {
   EXPECT_TRUE(layout.children[0].children.empty());
 }
 
-TEST(AruiFlatPainter, EmitsWorldSpaceShapesAndPhysicalText) {
+TEST(VisrFlatPainter, EmitsWorldSpaceShapesAndPhysicalText) {
   Language::Style panelStyle;
   panelStyle.painterProperties.emplace(
       "fill", Language::Color{{0.2F, 0.4F, 0.6F, 1.0F}});
@@ -155,7 +155,7 @@ TEST(AruiFlatPainter, EmitsWorldSpaceShapesAndPhysicalText) {
 
   RecordingSink sink;
   Runtime::PaintContext draw{sink};
-  Runtime::AruiFlatPainter painter;
+  Runtime::VisrFlatPainter painter;
   const glm::mat4 localToWorld =
       glm::translate(glm::mat4{1.0F}, {1.0F, 2.0F, 3.0F});
   painter.Paint({.draw = draw,
@@ -175,7 +175,7 @@ TEST(AruiFlatPainter, EmitsWorldSpaceShapesAndPhysicalText) {
   EXPECT_EQ(sink.texts[0].fontFamily, "Physical Sans");
 }
 
-TEST(AruiFlatPainter, InvisibleSubtreesEmitNoPrimitivesAndSchemaIsAccurate) {
+TEST(VisrFlatPainter, InvisibleSubtreesEmitNoPrimitivesAndSchemaIsAccurate) {
   Language::Style panelStyle;
   panelStyle.painterProperties.emplace(
       "fill", Language::Color{{1.0F, 1.0F, 1.0F, 1.0F}});
@@ -188,7 +188,7 @@ TEST(AruiFlatPainter, InvisibleSubtreesEmitNoPrimitivesAndSchemaIsAccurate) {
 
   RecordingSink sink;
   Runtime::PaintContext draw{sink};
-  Runtime::AruiFlatPainter painter;
+  Runtime::VisrFlatPainter painter;
   painter.Paint({.draw = draw,
                  .tree = tree,
                  .root = tree.RootChildren().front(),

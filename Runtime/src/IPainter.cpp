@@ -1,9 +1,9 @@
-#include "ARUI/Runtime/IPainter.hpp"
+#include "VISR/Runtime/IPainter.hpp"
 
 #include <stdexcept>
 #include <utility>
 
-namespace ARUI::Runtime {
+namespace VISR::Runtime {
 
 void PainterRegistry::Register(std::string name,
                                std::shared_ptr<const IPainter> painter) {
@@ -20,4 +20,4 @@ const IPainter *PainterRegistry::Find(std::string_view name) const noexcept {
   return found == painters_.end() ? nullptr : found->second.get();
 }
 
-} // namespace ARUI::Runtime
+} // namespace VISR::Runtime

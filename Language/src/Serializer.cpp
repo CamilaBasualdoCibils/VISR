@@ -1,8 +1,8 @@
-#include "ARUI/Language/Serializer.hpp"
+#include "VISR/Language/Serializer.hpp"
 #include <pugixml.hpp>
 #include <type_traits>
 
-namespace ARUI::Language {
+namespace VISR::Language {
 namespace {
 const char *NodeName(LNodeType type) {
   switch (type) {
@@ -91,7 +91,7 @@ void WriteNode(pugi::xml_node parent, const LNode &node) {
 
 std::string SerializeMarkup(const Document &document) {
   pugi::xml_document xml;
-  auto root = xml.append_child("arui");
+  auto root = xml.append_child("visr");
   for (const auto &stylesheet : document.stylesheets)
     root.append_child("style")
         .append_child(pugi::node_cdata)
@@ -126,4 +126,4 @@ std::string SerializeStyles(const StyleSheet &sheet) {
   }
   return output;
 }
-} // namespace ARUI::Language
+} // namespace VISR::Language

@@ -1,5 +1,5 @@
-#include "ARUI/Language/Parser.hpp"
-#include "ARUI/Presentation/RpcPresentationController.hpp"
+#include "VISR/Language/Parser.hpp"
+#include "VISR/Presentation/RpcPresentationController.hpp"
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -18,7 +18,7 @@ namespace {
 
 constexpr const char *kDefaultStack = R"(<stack>
   <panel>
-    <text>Hello from ARUI Manual Presenter</text>
+    <text>Hello from VISR Manual Presenter</text>
   </panel>
 </stack>)";
 
@@ -32,7 +32,7 @@ public:
     glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     window_ =
-        glfwCreateWindow(900, 700, "ARUI Manual Presenter", nullptr, nullptr);
+        glfwCreateWindow(900, 700, "VISR Manual Presenter", nullptr, nullptr);
     if (!window_)
       throw std::runtime_error("GLFW failed to create the window");
     glfwMakeContextCurrent(window_);
@@ -79,10 +79,10 @@ private:
     constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration |
                                        ImGuiWindowFlags_NoMove |
                                        ImGuiWindowFlags_NoSavedSettings;
-    ImGui::Begin("ARUI Manual Presenter", nullptr, flags);
-    ImGui::TextUnformatted("ARUI Manual Presenter");
+    ImGui::Begin("VISR Manual Presenter", nullptr, flags);
+    ImGui::TextUnformatted("VISR Manual Presenter");
     ImGui::TextDisabled(
-        "Enter a <stack> and push it to the active ARUI surface.");
+        "Enter a <stack> and push it to the active VISR surface.");
     ImGui::Separator();
 
     ImGui::SetNextItemWidth(320.0F);
@@ -109,7 +109,7 @@ private:
   }
 
   void Present() {
-    const auto parsed = ARUI::Language::ParseMarkup(stackSource_);
+    const auto parsed = VISR::Language::ParseMarkup(stackSource_);
     if (!parsed) {
       const auto &diagnostic = parsed.diagnostics.front();
       status_ = "Line " + std::to_string(diagnostic.line) + ", column " +
@@ -118,7 +118,7 @@ private:
       return;
     }
     try {
-      ARUI::Presentation::RpcPresentationController controller{
+      VISR::Presentation::RpcPresentationController controller{
           host_, static_cast<std::uint16_t>(port_)};
       controller.SetActiveTree(parsed.value.surfaces.front());
       status_ = "Presented to " + host_ + ":" + std::to_string(port_);
@@ -143,7 +143,7 @@ int main() {
   try {
     return ManualPresenter{}.Run();
   } catch (const std::exception &error) {
-    std::fprintf(stderr, "arui-manual-presenter: %s\n", error.what());
+    std::fprintf(stderr, "visr-manual-presenter: %s\n", error.what());
     return 1;
   }
 }

@@ -17,6 +17,6 @@
     ]
   },
   "cmake.configureArgs": [
-    "-DARUI_ENABLE_TRACY=ON"
+    "-DVISR_ENABLE_TRACY=ON"
   ]
 }

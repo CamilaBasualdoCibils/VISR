@@ -62,7 +62,7 @@ function(add_spirv_shader_library)
     #
     # We want:
     #
-    #     ARUI::Shaders::OpenGL
+    #     VISR::Shaders::OpenGL
     #
     # to remain exactly that.
     #
@@ -580,7 +580,7 @@ std::span<const ShaderBinary* const> GetShaders()
     #
     # Allows:
     #
-    #     cmake --build build --target ARUI_OpenGLShaders_SPIRV
+    #     cmake --build build --target VISR_OpenGLShaders_SPIRV
     #
     # without compiling the generated C++ library.
     # =========================================================================

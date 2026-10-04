@@ -1,0 +1,13 @@
+<visr>
+    <style>
+    .red-panel {
+        fill: #ff000080;
+        padding: 1cm;
+    }
+    </style>
+    <surface width="10cm" height="10cm" anchor="right_hand" x-rotation="-90deg" y-rotation="-90deg" y-offset="3cm" z-offset="-0.5cm">
+        <panel class="red-panel">
+            <text>Filled by visr-flat-painter</text>
+        </panel>
+    </surface>
+</visr>

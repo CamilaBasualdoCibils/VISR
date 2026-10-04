@@ -1,8 +1,8 @@
-#include "ARUI/Language/Parser.hpp"
-#include "ARUI/Language/Serializer.hpp"
+#include "VISR/Language/Parser.hpp"
+#include "VISR/Language/Serializer.hpp"
 #include <gtest/gtest.h>
 #include <string_view>
-using namespace ARUI::Language;
+using namespace VISR::Language;
 
 namespace {
 const LNode &OnlySurface(const ParseResult<Document> &parsed) {
@@ -11,9 +11,9 @@ const LNode &OnlySurface(const ParseResult<Document> &parsed) {
 } // namespace
 
 TEST(Parser, ParsesMinimalDocumentAndPreservesText) {
-  const auto parsed = ParseARUI(R"(<arui>
-    <surface width="20cm" height="10cm"><text>Hello, ARUI!</text></surface>
-  </arui>)");
+  const auto parsed = ParseVISR(R"(<visr>
+    <surface width="20cm" height="10cm"><text>Hello, VISR!</text></surface>
+  </visr>)");
   ASSERT_TRUE(parsed) << parsed.diagnostics.front().message;
   ASSERT_EQ(parsed.value.surfaces.size(), 1u);
   const auto &surface = OnlySurface(parsed);
@@ -22,15 +22,15 @@ TEST(Parser, ParsesMinimalDocumentAndPreservesText) {
   ASSERT_EQ(surface.children.size(), 1u);
   EXPECT_EQ(surface.children[0].type, LNodeType::Text);
   EXPECT_EQ(*surface.children[0].GetAttribute<std::string>("text"),
-            "Hello, ARUI!");
+            "Hello, VISR!");
   EXPECT_TRUE(surface.children[0].children.empty());
 }
 
 TEST(Parser, PreservesNestedHierarchyAndIgnoresCommentsAndWhitespace) {
-  const auto parsed = ParseMarkup(R"(<arui><!-- document -->
+  const auto parsed = ParseMarkup(R"(<visr><!-- document -->
     <surface width="1m" height="250mm"><column><text>Hello</text>
       <row><panel><text>A</text></panel><panel><text>B</text></panel></row>
-    </column></surface></arui>)");
+    </column></surface></visr>)");
   ASSERT_TRUE(parsed);
   const auto &column = OnlySurface(parsed).children.at(0);
   EXPECT_EQ(column.type, LNodeType::Column);
@@ -41,10 +41,10 @@ TEST(Parser, PreservesNestedHierarchyAndIgnoresCommentsAndWhitespace) {
 }
 
 TEST(Parser, ParsesMultipleSurfacesAndAllPhysicalUnits) {
-  const auto parsed = ParseMarkup(R"(<arui>
+  const auto parsed = ParseMarkup(R"(<visr>
     <surface width="20mm" height="10cm"/>
     <surface width="2m" height="30mm"/>
-  </arui>)");
+  </visr>)");
   ASSERT_TRUE(parsed);
   ASSERT_EQ(parsed.value.surfaces.size(), 2u);
   EXPECT_EQ(parsed.value.surfaces[0].style.width.unit, LengthUnit::Millimeter);
@@ -53,10 +53,10 @@ TEST(Parser, ParsesMultipleSurfacesAndAllPhysicalUnits) {
 }
 
 TEST(Parser, ParsesSurfaceRotationsInDegreesAndRadians) {
-  const auto parsed = ParseMarkup(R"(<arui>
+  const auto parsed = ParseMarkup(R"(<visr>
     <surface width="20cm" height="10cm"
       x-rotation="45deg" y-rotation="-1.5rad" z-rotation="0deg"/>
-  </arui>)");
+  </visr>)");
   ASSERT_TRUE(parsed) << parsed.diagnostics.front().message;
   const auto &style = OnlySurface(parsed).style;
   ASSERT_TRUE(style.xRotation);
@@ -73,8 +73,8 @@ TEST(Parser, ParsesSurfaceRotationsInDegreesAndRadians) {
 TEST(Parser, RejectsMalformedAndUnsupportedSurfaceRotations) {
   for (const auto value : {"turn", "45", "45turn", "1.2.3deg"}) {
     const auto parsed = ParseMarkup(
-        "<arui><surface width='1m' height='1m' x-rotation='" +
-        std::string(value) + "'/></arui>");
+        "<visr><surface width='1m' height='1m' x-rotation='" +
+        std::string(value) + "'/></visr>");
     EXPECT_FALSE(parsed) << value;
     ASSERT_FALSE(parsed.diagnostics.empty());
     EXPECT_NE(parsed.diagnostics.front().message.find("rotation"),
@@ -84,11 +84,11 @@ TEST(Parser, RejectsMalformedAndUnsupportedSurfaceRotations) {
 }
 
 TEST(Parser, ExtractsStylesScriptsAndBehavior) {
-  const auto parsed = ParseMarkup(R"(<arui>
+  const auto parsed = ParseMarkup(R"(<visr>
     <style>.control { padding: 5mm; }</style>
     <script type="module">export function play(node) {}</script>
     <surface width="40cm" height="25cm"><panel class="control" behavior="play"/></surface>
-  </arui>)");
+  </visr>)");
   ASSERT_TRUE(parsed);
   ASSERT_EQ(parsed.value.stylesheets.size(), 1u);
   EXPECT_NE(parsed.value.stylesheets[0].find("padding: 5mm"),
@@ -102,9 +102,9 @@ TEST(Parser, ExtractsStylesScriptsAndBehavior) {
 }
 
 TEST(Parser, ParsesStateAsTypedReferenceAndImageNode) {
-  const auto parsed = ParseMarkup(R"(<arui><surface width="1m" height="1m">
+  const auto parsed = ParseMarkup(R"(<visr><surface width="1m" height="1m">
     <text state="system.cpu"/><image src="meter.png" alt="meter"/>
-  </surface></arui>)");
+  </surface></visr>)");
   ASSERT_TRUE(parsed);
   const auto &children = OnlySurface(parsed).children;
   EXPECT_EQ(children[0].GetAttribute<StateReference>("state")->value,
@@ -114,8 +114,8 @@ TEST(Parser, ParsesStateAsTypedReferenceAndImageNode) {
 
 class InvalidLength : public testing::TestWithParam<const char *> {};
 TEST_P(InvalidLength, RejectsUnsupportedUnit) {
-  const auto parsed = ParseMarkup(std::string("<arui><surface width=\"1") +
-                                  GetParam() + "\" height=\"1m\"/></arui>");
+  const auto parsed = ParseMarkup(std::string("<visr><surface width=\"1") +
+                                  GetParam() + "\" height=\"1m\"/></visr>");
   EXPECT_FALSE(parsed);
   ASSERT_FALSE(parsed.diagnostics.empty());
   EXPECT_NE(parsed.diagnostics[0].message.find("unsupported"),
@@ -125,18 +125,18 @@ INSTANTIATE_TEST_SUITE_P(UnsupportedUnits, InvalidLength,
                          testing::Values("px", "em", "rem"));
 
 TEST(Parser, RejectsMissingSurfaceWidthAndHeight) {
-  auto missingWidth = ParseMarkup("<arui><surface height=\"1m\"/></arui>");
+  auto missingWidth = ParseMarkup("<visr><surface height=\"1m\"/></visr>");
   EXPECT_FALSE(missingWidth);
   EXPECT_NE(missingWidth.diagnostics[0].message.find("width"),
             std::string::npos);
-  auto missingHeight = ParseMarkup("<arui><surface width=\"1m\"/></arui>");
+  auto missingHeight = ParseMarkup("<visr><surface width=\"1m\"/></visr>");
   EXPECT_FALSE(missingHeight);
   EXPECT_NE(missingHeight.diagnostics[0].message.find("height"),
             std::string::npos);
 }
 
 TEST(Parser, AcceptsDeclaredAttributesAndAssignsTypedValues) {
-  const auto parsed = ParseMarkup(R"(<arui>
+  const auto parsed = ParseMarkup(R"(<visr>
     <script type="module">export {};</script>
     <surface width="1m" height="25cm" anchor="desk" class="root" behavior="open">
       <group name="tools" class="layout" behavior="groupBehavior">
@@ -148,7 +148,7 @@ TEST(Parser, AcceptsDeclaredAttributesAndAssignsTypedValues) {
         <image src="meter.png" alt="meter" class="icon" behavior="imageBehavior"/>
       </group>
     </surface>
-  </arui>)");
+  </visr>)");
   ASSERT_TRUE(parsed) << parsed.diagnostics.front().message;
   const auto &surface = OnlySurface(parsed);
   EXPECT_EQ(*surface.GetAttribute<std::string>("anchor"), "desk");
@@ -165,10 +165,10 @@ TEST(Parser, AcceptsDeclaredAttributesAndAssignsTypedValues) {
 
 TEST(Parser, RejectsUnknownAttributesFromElementSchemas) {
   for (const auto markup : {
-           "<arui><surface width='1m' height='1m' bogus='x'/></arui>",
-           "<arui><surface width='1m' height='1m'><text "
-           "name='x'/></surface></arui>",
-           "<arui><script language='js'/></arui>",
+           "<visr><surface width='1m' height='1m' bogus='x'/></visr>",
+           "<visr><surface width='1m' height='1m'><text "
+           "name='x'/></surface></visr>",
+           "<visr><script language='js'/></visr>",
        }) {
     const auto parsed = ParseMarkup(markup);
     EXPECT_FALSE(parsed);
@@ -181,8 +181,8 @@ TEST(Parser, RejectsUnknownAttributesFromElementSchemas) {
 TEST(Parser, RejectsMalformedPhysicalLengths) {
   for (const auto value : {"wide", "0cm", "-1m", "1%"}) {
     const auto parsed =
-        ParseMarkup("<arui><surface width='" + std::string(value) +
-                    "' height='1m'/></arui>");
+        ParseMarkup("<visr><surface width='" + std::string(value) +
+                    "' height='1m'/></visr>");
     EXPECT_FALSE(parsed);
     ASSERT_FALSE(parsed.diagnostics.empty());
     EXPECT_NE(parsed.diagnostics[0].message.find("invalid <surface> width"),
@@ -192,19 +192,19 @@ TEST(Parser, RejectsMalformedPhysicalLengths) {
 
 TEST(Parser, EnforcesStyleAndScriptRestrictions) {
   const auto styled = ParseMarkup(
-      "<arui><style type='text/css'>panel { gap: 1mm; }</style></arui>");
+      "<visr><style type='text/css'>panel { gap: 1mm; }</style></visr>");
   EXPECT_FALSE(styled);
   ASSERT_FALSE(styled.diagnostics.empty());
   EXPECT_EQ(styled.diagnostics[0].message,
             "<style> does not accept attributes");
 
-  const auto nestedStyle = ParseMarkup("<arui><style><panel/></style></arui>");
+  const auto nestedStyle = ParseMarkup("<visr><style><panel/></style></visr>");
   EXPECT_FALSE(nestedStyle);
   EXPECT_NE(nestedStyle.diagnostics[0].message.find("cannot contain markup"),
             std::string::npos);
 
   const auto nestedScript =
-      ParseMarkup("<arui><script><panel/></script></arui>");
+      ParseMarkup("<visr><script><panel/></script></visr>");
   EXPECT_FALSE(nestedScript);
   EXPECT_NE(nestedScript.diagnostics[0].message.find("cannot contain markup"),
             std::string::npos);
@@ -213,33 +213,33 @@ TEST(Parser, EnforcesStyleAndScriptRestrictions) {
 TEST(Parser, RejectsInvalidRootUnknownNodesAndTopLevelElements) {
   EXPECT_FALSE(ParseMarkup("<surface width=\"1m\" height=\"1m\"/>"));
   auto unknown = ParseMarkup(
-      "<arui><surface width=\"1m\" height=\"1m\"><slider/></surface></arui>");
+      "<visr><surface width=\"1m\" height=\"1m\"><slider/></surface></visr>");
   EXPECT_FALSE(unknown);
   EXPECT_NE(unknown.diagnostics[0].message.find("slider"), std::string::npos);
-  auto top = ParseMarkup("<arui><metadata/></arui>");
+  auto top = ParseMarkup("<visr><metadata/></visr>");
   EXPECT_FALSE(top);
   EXPECT_NE(top.diagnostics[0].message.find("metadata"), std::string::npos);
 }
 
 TEST(Parser, RejectsInvalidAttributesExternalScriptsAndMalformedXml) {
-  auto attribute = ParseMarkup("<arui><surface width=\"1m\" height=\"1m\"><row "
-                               "bogus=\"x\"/></surface></arui>");
+  auto attribute = ParseMarkup("<visr><surface width=\"1m\" height=\"1m\"><row "
+                               "bogus=\"x\"/></surface></visr>");
   EXPECT_FALSE(attribute);
   EXPECT_NE(attribute.diagnostics[0].message.find("bogus"), std::string::npos);
-  auto external = ParseMarkup("<arui><script src=\"./test.js\"/></arui>");
+  auto external = ParseMarkup("<visr><script src=\"./test.js\"/></visr>");
   EXPECT_FALSE(external);
   EXPECT_NE(external.diagnostics[0].message.find("./test.js"),
             std::string::npos);
-  auto malformed = ParseMarkup("<arui><surface></arui>");
+  auto malformed = ParseMarkup("<visr><surface></visr>");
   EXPECT_FALSE(malformed);
   EXPECT_NE(malformed.diagnostics[0].message.find("XML syntax error"),
             std::string::npos);
   EXPECT_GT(malformed.diagnostics[0].column, 0u);
 }
 
-TEST(Parser, MarkupRoundTripsAsAruiDocument) {
-  const auto parsed = ParseMarkup(R"(<arui><style>panel { gap: 1mm; }</style>
-    <surface width="40cm" height="25cm"><text>Hello</text></surface></arui>)");
+TEST(Parser, MarkupRoundTripsAsVisrDocument) {
+  const auto parsed = ParseMarkup(R"(<visr><style>panel { gap: 1mm; }</style>
+    <surface width="40cm" height="25cm"><text>Hello</text></surface></visr>)");
   ASSERT_TRUE(parsed);
   const auto reparsed = ParseMarkup(SerializeMarkup(parsed.value));
   ASSERT_TRUE(reparsed) << reparsed.diagnostics[0].message;
@@ -258,10 +258,10 @@ TEST(Parser, StyleSheetRoundTripsUnchanged) {
 }
 
 TEST(Parser, ResolvesClassFillToTypedColor) {
-  const auto parsed = ParseARUI(R"(<arui>
+  const auto parsed = ParseVISR(R"(<visr>
     <style>.red { fill: #ff000080; }</style>
     <surface width="20cm" height="10cm"><panel class="red"/></surface>
-  </arui>)");
+  </visr>)");
   ASSERT_TRUE(parsed) << parsed.diagnostics.front().message;
   const auto &properties =
       OnlySurface(parsed).children.at(0).style.painterProperties;
@@ -274,8 +274,8 @@ TEST(Parser, ResolvesClassFillToTypedColor) {
 }
 
 TEST(Parser, RejectsNamedAndMalformedFillColors) {
-  EXPECT_FALSE(ParseARUI(R"(<arui><style>.bad { fill: red; }</style>
-    <surface width="1m" height="1m"><panel class="bad"/></surface></arui>)"));
-  EXPECT_FALSE(ParseARUI(R"(<arui><style>.bad { fill: #1234; }</style>
-    <surface width="1m" height="1m"><panel class="bad"/></surface></arui>)"));
+  EXPECT_FALSE(ParseVISR(R"(<visr><style>.bad { fill: red; }</style>
+    <surface width="1m" height="1m"><panel class="bad"/></surface></visr>)"));
+  EXPECT_FALSE(ParseVISR(R"(<visr><style>.bad { fill: #1234; }</style>
+    <surface width="1m" height="1m"><panel class="bad"/></surface></visr>)"));
 }

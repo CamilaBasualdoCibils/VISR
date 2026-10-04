@@ -1,9 +1,9 @@
-#include "ARUI/Presentation/RuntimePresentationController.hpp"
+#include "VISR/Presentation/RuntimePresentationController.hpp"
 
 #include <stdexcept>
 #include <vector>
 
-namespace ARUI::Presentation {
+namespace VISR::Presentation {
 namespace {
 Language::LNode ToLanguageTree(const Runtime::RuntimeTree &runtime, Runtime::NodeID id) {
   const auto *source = runtime.Get(id);
@@ -47,4 +47,4 @@ void RuntimePresentationController::Remove(Language::LNodeID node) {
 void RuntimePresentationController::Clear() {
   const std::scoped_lock lock(runtimeMutex_); const std::vector<Runtime::NodeID> roots(runtime_.RootChildren().begin(), runtime_.RootChildren().end()); auto transaction = runtime_.BeginTransaction(); for (auto root : roots) transaction.Remove(root); transaction.Commit();
 }
-} // namespace ARUI::Presentation
+} // namespace VISR::Presentation
