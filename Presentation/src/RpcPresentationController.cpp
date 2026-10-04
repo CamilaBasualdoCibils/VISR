@@ -10,15 +10,6 @@
 #include <vector>
 
 namespace ARUI::Presentation {
-namespace {
-std::int64_t Duration(Transition transition) {
-  return transition.duration.count();
-}
-int EasingValue(Transition transition) {
-  return static_cast<int>(transition.easing);
-}
-} // namespace
-
 class RpcPresentationController::Impl {
 public:
   Impl(std::string host, std::uint16_t port) : client(std::move(host), port) {
@@ -46,57 +37,31 @@ RpcPresentationController::RpcPresentationController(
 RpcPresentationController &RpcPresentationController::operator=(
     RpcPresentationController &&) noexcept = default;
 
-PresentationNodeID
-RpcPresentationController::CreateNode(PresentationNodeID parent,
-                                      const Language::LNode &node,
-                                      Transition transition) {
-  return impl_->client
-      .call("presentation.createNode", parent, Wire::EncodeNode(node),
-            Duration(transition), EasingValue(transition))
-      .as<PresentationNodeID>();
+Language::LNode RpcPresentationController::GetActiveTree() const {
+  return Wire::DecodeNode(
+      impl_->client.call("presentation.getActiveTree").as<std::string>());
 }
-PresentationNodeID
-RpcPresentationController::CreateTree(PresentationNodeID parent,
-                                      const Language::LNode &tree,
-                                      Transition transition) {
-  return impl_->client
-      .call("presentation.createTree", parent, Wire::EncodeNode(tree),
-            Duration(transition), EasingValue(transition))
-      .as<PresentationNodeID>();
+void RpcPresentationController::SetActiveTree(Language::LNode tree) {
+  impl_->client.call("presentation.setActiveTree", Wire::EncodeNode(tree));
 }
-void RpcPresentationController::Remove(PresentationNodeID node,
-                                       Transition transition) {
-  impl_->client.call("presentation.remove", node, Duration(transition),
-                     EasingValue(transition));
+void RpcPresentationController::AddTree(Language::LNodeID parent,
+                                        Language::LNode tree) {
+  impl_->client.call("presentation.addTree", parent, Wire::EncodeNode(tree));
 }
-void RpcPresentationController::Move(PresentationNodeID node,
-                                     PresentationNodeID newParent,
-                                     Transition transition) {
-  impl_->client.call("presentation.move", node, newParent, Duration(transition),
-                     EasingValue(transition));
+void RpcPresentationController::UpdateNode(Language::LNodeID node,
+                                           Language::LNode replacement) {
+  impl_->client.call("presentation.updateNode", node,
+                     Wire::EncodeNode(replacement));
 }
-void RpcPresentationController::SetStyle(PresentationNodeID node,
-                                         Language::Style style,
-                                         Transition transition) {
-  impl_->client.call("presentation.setStyle", node, Wire::EncodeStyle(style),
-                     Duration(transition), EasingValue(transition));
+void RpcPresentationController::Move(Language::LNodeID node,
+                                     Language::LNodeID newParent) {
+  impl_->client.call("presentation.move", node, newParent);
 }
-void RpcPresentationController::SetVisibility(PresentationNodeID node,
-                                              bool visible,
-                                              Transition transition) {
-  impl_->client.call("presentation.setVisibility", node, visible,
-                     Duration(transition), EasingValue(transition));
+void RpcPresentationController::Remove(Language::LNodeID node) {
+  impl_->client.call("presentation.remove", node);
 }
-void RpcPresentationController::ReorderChildren(
-    PresentationNodeID parent, std::span<const PresentationNodeID> children,
-    Transition transition) {
-  impl_->client.call(
-      "presentation.reorderChildren", parent,
-      std::vector<PresentationNodeID>{children.begin(), children.end()},
-      Duration(transition), EasingValue(transition));
+void RpcPresentationController::Clear() {
+  impl_->client.call("presentation.clear");
 }
-void RpcPresentationController::Reset(Transition transition) {
-  impl_->client.call("presentation.reset", Duration(transition),
-                     EasingValue(transition));
-}
+
 } // namespace ARUI::Presentation

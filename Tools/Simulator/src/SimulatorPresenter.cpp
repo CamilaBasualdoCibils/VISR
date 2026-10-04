@@ -547,6 +547,7 @@ bool SimulatorPresenter::DrawLanguageNodeEditor(Language::LNode &node,
       editLength("Margin", node.style.margin);
       editLength("Padding", node.style.padding);
       editLength("Gap", node.style.gap);
+      editLength("Font Size", node.style.fontSize);
       if (node.type == Language::LNodeType::Surface) {
         editLength("X Offset", node.style.xOffset);
         editLength("Y Offset", node.style.yOffset);

@@ -69,6 +69,7 @@ public:
   // Inserts one node. Use InsertTree when the language node has children.
   NodeID Insert(NodeID parent, const Language::LNode &node);
   NodeID InsertTree(NodeID parent, const Language::LNode &tree);
+  void Replace(NodeID node, const Language::LNode &replacement);
   void Remove(NodeID node);
   void Move(NodeID node, NodeID newParent);
   void SetStyle(NodeID node, Language::Style style);

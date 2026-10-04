@@ -18,23 +18,13 @@ public:
   RpcPresentationController(RpcPresentationController &&) noexcept;
   RpcPresentationController &operator=(RpcPresentationController &&) noexcept;
 
-  PresentationNodeID CreateNode(PresentationNodeID parent,
-                                const Language::LNode &node,
-                                Transition transition = {}) override;
-  PresentationNodeID CreateTree(PresentationNodeID parent,
-                                const Language::LNode &tree,
-                                Transition transition = {}) override;
-  void Remove(PresentationNodeID node, Transition transition = {}) override;
-  void Move(PresentationNodeID node, PresentationNodeID newParent,
-            Transition transition = {}) override;
-  void SetStyle(PresentationNodeID node, Language::Style style,
-                Transition transition = {}) override;
-  void SetVisibility(PresentationNodeID node, bool visible,
-                     Transition transition = {}) override;
-  void ReorderChildren(PresentationNodeID parent,
-                       std::span<const PresentationNodeID> children,
-                       Transition transition = {}) override;
-  void Reset(Transition transition = {}) override;
+  [[nodiscard]] Language::LNode GetActiveTree() const override;
+  void SetActiveTree(Language::LNode tree) override;
+  void AddTree(Language::LNodeID parent, Language::LNode tree) override;
+  void UpdateNode(Language::LNodeID node, Language::LNode replacement) override;
+  void Move(Language::LNodeID node, Language::LNodeID newParent) override;
+  void Remove(Language::LNodeID node) override;
+  void Clear() override;
 
 private:
   class Impl;

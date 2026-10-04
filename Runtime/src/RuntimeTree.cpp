@@ -92,7 +92,10 @@ NodeID RuntimeTransaction::Insert(NodeID parent, const Language::LNode &node) {
     throw std::invalid_argument(
         "Insert accepts one node; use InsertTree for descendants");
 
-  const NodeID id = nextID_++;
+  const NodeID id = node.id != RootNodeID ? node.id : nextID_++;
+  if (nodes_.contains(id))
+    throw std::invalid_argument("runtime node id already exists");
+  nextID_ = std::max(nextID_, id + 1);
   nodes_.emplace(id, RNode{.id = id,
                            .type = node.type,
                            .surfaceType = node.surfaceType,
@@ -115,6 +118,25 @@ NodeID RuntimeTransaction::InsertTree(NodeID parent,
   for (const auto &child : tree.children)
     InsertTree(rootID, child);
   return rootID;
+}
+
+void RuntimeTransaction::Replace(NodeID node, const Language::LNode &replacement) {
+  RequireActive();
+  const NodeID parent = Require(node).parent;
+  auto &siblings = ChildrenOf(parent);
+  const auto position = std::find(siblings.begin(), siblings.end(), node);
+  const auto index = static_cast<std::size_t>(position - siblings.begin());
+  Remove(node);
+  Language::LNode root = replacement;
+  root.id = node;
+  root.children.clear();
+  const NodeID inserted = Insert(parent, root);
+  if (inserted != node)
+    throw std::logic_error("replacement must preserve node identity");
+  siblings.erase(std::find(siblings.begin(), siblings.end(), inserted));
+  siblings.insert(siblings.begin() + index, inserted);
+  for (const auto &child : replacement.children)
+    InsertTree(inserted, child);
 }
 
 void RuntimeTransaction::RemoveSubtree(NodeID node) {

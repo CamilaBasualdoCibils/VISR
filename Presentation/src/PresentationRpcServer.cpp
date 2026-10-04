@@ -8,68 +8,18 @@
 #include <vector>
 
 namespace ARUI::Presentation {
-namespace {
-Transition DecodeTransition(std::int64_t duration, int easing) {
-  return {.duration = std::chrono::milliseconds{duration},
-          .easing = easing == static_cast<int>(Easing::EaseInOut)
-                        ? Easing::EaseInOut
-                        : Easing::Linear};
-}
-} // namespace
-
 class PresentationRpcServer::Impl {
 public:
   Impl(IPresentationController &controller, std::uint16_t port)
       : server("127.0.0.1", port) {
     server.bind("presentation.ping", [] { return true; });
-    server.bind("presentation.createNode",
-                [&controller](PresentationNodeID parent, std::string node,
-                              std::int64_t duration, int easing) {
-                  return controller.CreateNode(
-                      parent, Wire::DecodeNode(node),
-                      DecodeTransition(duration, easing));
-                });
-    server.bind("presentation.createTree",
-                [&controller](PresentationNodeID parent, std::string tree,
-                              std::int64_t duration, int easing) {
-                  return controller.CreateTree(
-                      parent, Wire::DecodeNode(tree),
-                      DecodeTransition(duration, easing));
-                });
-    server.bind("presentation.remove",
-                [&controller](PresentationNodeID node, std::int64_t duration,
-                              int easing) {
-                  controller.Remove(node, DecodeTransition(duration, easing));
-                });
-    server.bind("presentation.move", [&controller](PresentationNodeID node,
-                                                   PresentationNodeID newParent,
-                                                   std::int64_t duration,
-                                                   int easing) {
-      controller.Move(node, newParent, DecodeTransition(duration, easing));
-    });
-    server.bind("presentation.setStyle",
-                [&controller](PresentationNodeID node, std::string style,
-                              std::int64_t duration, int easing) {
-                  controller.SetStyle(node, Wire::DecodeStyle(style),
-                                      DecodeTransition(duration, easing));
-                });
-    server.bind("presentation.setVisibility",
-                [&controller](PresentationNodeID node, bool visible,
-                              std::int64_t duration, int easing) {
-                  controller.SetVisibility(node, visible,
-                                           DecodeTransition(duration, easing));
-                });
-    server.bind("presentation.reorderChildren",
-                [&controller](PresentationNodeID parent,
-                              std::vector<PresentationNodeID> children,
-                              std::int64_t duration, int easing) {
-                  controller.ReorderChildren(
-                      parent, children, DecodeTransition(duration, easing));
-                });
-    server.bind("presentation.reset",
-                [&controller](std::int64_t duration, int easing) {
-                  controller.Reset(DecodeTransition(duration, easing));
-                });
+    server.bind("presentation.getActiveTree", [&controller] { return Wire::EncodeNode(controller.GetActiveTree()); });
+    server.bind("presentation.setActiveTree", [&controller](std::string tree) { controller.SetActiveTree(Wire::DecodeNode(tree)); });
+    server.bind("presentation.addTree", [&controller](Language::LNodeID parent, std::string tree) { controller.AddTree(parent, Wire::DecodeNode(tree)); });
+    server.bind("presentation.updateNode", [&controller](Language::LNodeID node, std::string replacement) { controller.UpdateNode(node, Wire::DecodeNode(replacement)); });
+    server.bind("presentation.move", [&controller](Language::LNodeID node, Language::LNodeID parent) { controller.Move(node, parent); });
+    server.bind("presentation.remove", [&controller](Language::LNodeID node) { controller.Remove(node); });
+    server.bind("presentation.clear", [&controller] { controller.Clear(); });
   }
   rpc::server server;
 };

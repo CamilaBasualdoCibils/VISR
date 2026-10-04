@@ -1,87 +1,50 @@
 #include "ARUI/Presentation/RuntimePresentationController.hpp"
 
+#include <stdexcept>
 #include <vector>
 
 namespace ARUI::Presentation {
 namespace {
-Runtime::CommitOptions CommitOptions(Transition transition) {
-  return {.duration = transition.duration,
-          .easing = transition.easing == Easing::EaseInOut
-                        ? Runtime::Easing::EaseInOut
-                        : Runtime::Easing::Linear};
+Language::LNode ToLanguageTree(const Runtime::RuntimeTree &runtime, Runtime::NodeID id) {
+  const auto *source = runtime.Get(id);
+  if (!source)
+    throw std::out_of_range("runtime node does not exist");
+  Language::LNode node{.id = source->id, .type = source->type,
+                       .surfaceType = source->surfaceType,
+                       .attributes = source->attributes, .style = source->style};
+  for (const auto child : source->children)
+    node.children.push_back(ToLanguageTree(runtime, child));
+  return node;
 }
-} // namespace
-
-RuntimePresentationController::RuntimePresentationController(
-    Runtime::RuntimeTree &runtime, std::mutex &runtimeMutex)
-    : runtime_(runtime), runtimeMutex_(runtimeMutex) {}
-
-PresentationNodeID
-RuntimePresentationController::CreateNode(PresentationNodeID parent,
-                                          const Language::LNode &node,
-                                          Transition transition) {
-  const std::scoped_lock lock(runtimeMutex_);
-  auto transaction = runtime_.BeginTransaction();
-  const auto id = transaction.Insert(parent, node);
-  transaction.Commit(CommitOptions(transition));
-  return id;
 }
-PresentationNodeID
-RuntimePresentationController::CreateTree(PresentationNodeID parent,
-                                          const Language::LNode &tree,
-                                          Transition transition) {
+RuntimePresentationController::RuntimePresentationController(Runtime::RuntimeTree &runtime, std::mutex &runtimeMutex) : runtime_(runtime), runtimeMutex_(runtimeMutex) {}
+Language::LNode RuntimePresentationController::GetActiveTree() const {
   const std::scoped_lock lock(runtimeMutex_);
-  auto transaction = runtime_.BeginTransaction();
-  const auto id = transaction.InsertTree(parent, tree);
-  transaction.Commit(CommitOptions(transition));
-  return id;
+  const auto &roots = runtime_.RootChildren();
+  if (roots.empty()) return Language::LSurface();
+  if (roots.size() != 1) throw std::logic_error("active presentation must have one root");
+  return ToLanguageTree(runtime_, roots.front());
 }
-void RuntimePresentationController::Remove(PresentationNodeID node,
-                                           Transition transition) {
-  const std::scoped_lock lock(runtimeMutex_);
-  auto transaction = runtime_.BeginTransaction();
-  transaction.Remove(node);
-  transaction.Commit(CommitOptions(transition));
+void RuntimePresentationController::SetActiveTree(Language::LNode tree) {
+  if (tree.type != Language::LNodeType::Surface) throw std::invalid_argument("active tree root must be a surface");
+  Clear();
+  AddTree(Runtime::RootNodeID, std::move(tree));
 }
-void RuntimePresentationController::Move(PresentationNodeID node,
-                                         PresentationNodeID newParent,
-                                         Transition transition) {
-  const std::scoped_lock lock(runtimeMutex_);
-  auto transaction = runtime_.BeginTransaction();
-  transaction.Move(node, newParent);
-  transaction.Commit(CommitOptions(transition));
+void RuntimePresentationController::AddTree(Language::LNodeID parent, Language::LNode tree) {
+  const std::scoped_lock lock(runtimeMutex_); auto transaction = runtime_.BeginTransaction();
+  transaction.InsertTree(parent, tree); transaction.Commit();
 }
-void RuntimePresentationController::SetStyle(PresentationNodeID node,
-                                             Language::Style style,
-                                             Transition transition) {
-  const std::scoped_lock lock(runtimeMutex_);
-  auto transaction = runtime_.BeginTransaction();
-  transaction.SetStyle(node, std::move(style));
-  transaction.Commit(CommitOptions(transition));
+void RuntimePresentationController::UpdateNode(Language::LNodeID node, Language::LNode replacement) {
+  const std::scoped_lock lock(runtimeMutex_); auto transaction = runtime_.BeginTransaction();
+  transaction.Replace(node, replacement); transaction.Commit();
 }
-void RuntimePresentationController::SetVisibility(PresentationNodeID node,
-                                                  bool visible,
-                                                  Transition transition) {
-  const std::scoped_lock lock(runtimeMutex_);
-  auto transaction = runtime_.BeginTransaction();
-  transaction.SetVisibility(node, visible);
-  transaction.Commit(CommitOptions(transition));
+void RuntimePresentationController::Move(Language::LNodeID node, Language::LNodeID newParent) {
+  const std::scoped_lock lock(runtimeMutex_); auto transaction = runtime_.BeginTransaction(); transaction.Move(node, newParent); transaction.Commit();
 }
-void RuntimePresentationController::ReorderChildren(
-    PresentationNodeID parent, std::span<const PresentationNodeID> children,
-    Transition transition) {
-  const std::scoped_lock lock(runtimeMutex_);
-  auto transaction = runtime_.BeginTransaction();
-  transaction.ReorderChildren(parent, children);
-  transaction.Commit(CommitOptions(transition));
+void RuntimePresentationController::Remove(Language::LNodeID node) {
+  const std::scoped_lock lock(runtimeMutex_); auto transaction = runtime_.BeginTransaction(); transaction.Remove(node); transaction.Commit();
 }
-void RuntimePresentationController::Reset(Transition transition) {
-  const std::scoped_lock lock(runtimeMutex_);
-  const std::vector<Runtime::NodeID> roots(runtime_.RootChildren().begin(),
-                                           runtime_.RootChildren().end());
-  auto transaction = runtime_.BeginTransaction();
-  for (const auto root : roots)
-    transaction.Remove(root);
-  transaction.Commit(CommitOptions(transition));
+void RuntimePresentationController::Clear() {
+  const std::scoped_lock lock(runtimeMutex_); const std::vector<Runtime::NodeID> roots(runtime_.RootChildren().begin(), runtime_.RootChildren().end()); auto transaction = runtime_.BeginTransaction(); for (auto root : roots) transaction.Remove(root); transaction.Commit();
 }
 } // namespace ARUI::Presentation
