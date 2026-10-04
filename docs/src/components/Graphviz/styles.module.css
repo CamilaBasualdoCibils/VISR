@@ -1,0 +1,7 @@
+.diagram {
+  overflow-x: auto; margin: 1.5rem 0; padding: 1rem;
+  border: 1px solid var(--ifm-color-emphasis-200); border-radius: 1rem;
+  background: var(--ifm-background-surface-color); text-align: center;
+}
+.diagram svg { max-width: 100%; height: auto; }
+.loading { color: var(--ifm-color-emphasis-600); }

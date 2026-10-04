@@ -1,0 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap');
+:root {
+  --ifm-font-family-base: 'Manrope', system-ui, sans-serif;
+  --ifm-font-family-monospace: 'DM Mono', ui-monospace, monospace;
+  --ifm-color-primary: #5d6be5; --ifm-color-primary-dark: #4352df;
+  --ifm-color-primary-darker: #3545dc; --ifm-color-primary-darkest: #202fb8;
+  --ifm-color-primary-light: #7783eb; --ifm-color-primary-lighter: #8590ee;
+  --ifm-color-primary-lightest: #aab2f4; --ifm-code-font-size: 90%; --ifm-heading-font-weight: 700;
+}
+[data-theme='dark'] {
+  --ifm-background-color: #10131a; --ifm-background-surface-color: #171b24;
+  --ifm-navbar-background-color: rgba(16,19,26,.88); --ifm-footer-background-color: #0b0e13;
+  --ifm-color-primary: #9aa4ff; --ifm-color-primary-dark: #7b87ff;
+  --ifm-color-primary-darker: #6d7aff; --ifm-color-primary-darkest: #3f50ff;
+  --ifm-color-primary-light: #b9c0ff; --ifm-color-primary-lighter: #c7ccff;
+  --ifm-color-primary-lightest: #f3f4ff;
+}
+.navbar { backdrop-filter: blur(16px); border-bottom: 1px solid var(--ifm-color-emphasis-200); }
+.markdown h1, .markdown h2 { letter-spacing: -.035em; }
+.theme-doc-markdown { max-width: 78ch; }

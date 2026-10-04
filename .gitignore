@@ -1,3 +1,8 @@
 .cache
 build
 
+# Docusaurus site
+docs/node_modules
+docs/.docusaurus
+docs/.npm
+docs/build
