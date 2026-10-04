@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <glm/ext/matrix_float4x4.hpp>
 #include <vector>
 
 namespace ARUI::Render {
@@ -16,6 +17,7 @@ struct RendererConfiguration {
   GraphicsPipelineHandle textPipeline;
   std::filesystem::path fontFile;
   RenderPassDesc renderPass;
+  glm::mat4 worldToClip{1.0F};
 };
 
 struct RendererSubmissionCounts {

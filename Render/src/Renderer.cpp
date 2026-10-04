@@ -30,30 +30,28 @@ struct RenderPassData {
 };
 
 struct TextVertex {
-  glm::vec3 position;
+  glm::vec4 position;
   glm::vec2 uv;
 };
 
-glm::vec3 TransformPosition(const glm::mat4 &transform, glm::vec3 point) {
-  const glm::vec4 homogeneous = transform * glm::vec4{point, 1.0F};
-  if (std::abs(homogeneous.w) < 1.0e-6F)
-    return glm::vec3{homogeneous};
-  return glm::vec3{homogeneous} / homogeneous.w;
+glm::vec4 TransformPosition(const glm::mat4 &transform, glm::vec3 point) {
+  return transform * glm::vec4{point, 1.0F};
 }
 
 struct GeometryBatch {
-  std::vector<glm::vec3> vertices;
+  std::vector<glm::vec4> vertices;
   std::vector<uint32_t> indices;
 };
 
 void AppendMesh(GeometryBatch &batch, const MeshGeometry &mesh,
-                const glm::mat4 &transform) {
+                const glm::mat4 &localToWorld, const glm::mat4 &worldToClip) {
   if (mesh.positions.empty() || mesh.topology != MeshTopology::Triangles)
     return;
 
   const auto baseVertex = static_cast<uint32_t>(batch.vertices.size());
   for (const auto &position : mesh.positions)
-    batch.vertices.emplace_back(TransformPosition(transform, position));
+    batch.vertices.emplace_back(
+        TransformPosition(worldToClip * localToWorld, position));
 
   if (mesh.indices.empty()) {
     for (uint32_t i = 0; i < mesh.positions.size(); ++i)
@@ -68,8 +66,8 @@ void AppendMesh(GeometryBatch &batch, const MeshGeometry &mesh,
   }
 }
 
-void AppendFilledPath(GeometryBatch &batch,
-                      const FillPathRenderObject &object) {
+void AppendFilledPath(GeometryBatch &batch, const FillPathRenderObject &object,
+                      const glm::mat4 &worldToClip) {
   if (!std::holds_alternative<SolidFill>(object.style.fill))
     return;
   std::vector<glm::vec3> polygon;
@@ -86,7 +84,7 @@ void AppendFilledPath(GeometryBatch &batch,
   const auto base = static_cast<uint32_t>(batch.vertices.size());
   for (const auto &point : polygon)
     batch.vertices.emplace_back(
-        TransformPosition(object.transform.localToWorld, point));
+        TransformPosition(worldToClip * object.transform.localToWorld, point));
   for (uint32_t i = 1; i + 1 < polygon.size(); ++i) {
     batch.indices.push_back(base);
     batch.indices.push_back(base + i);
@@ -94,8 +92,52 @@ void AppendFilledPath(GeometryBatch &batch,
   }
 }
 
+void AppendStrokedPath(GeometryBatch &batch,
+                       const StrokePathRenderObject &object,
+                       const glm::mat4 &worldToClip) {
+  if (!object.style.width.IsAbsolute() || object.style.width.Value() <= 0.0)
+    return;
+  std::vector<glm::vec2> points;
+  for (const auto &command : object.path.commands) {
+    if (const auto *move = std::get_if<MoveTo>(&command))
+      points.push_back(move->point);
+    else if (const auto *line = std::get_if<LineTo>(&command))
+      points.push_back(line->point);
+    else if (!std::holds_alternative<ClosePath>(command))
+      return;
+  }
+  if (points.size() < 2)
+    return;
+
+  const float halfWidth =
+      static_cast<float>(
+          object.style.width.As(Language::LengthUnit::Meter).Value()) *
+      0.5F;
+  const bool closed = object.path.IsClosed();
+  const std::size_t segmentCount = closed ? points.size() : points.size() - 1;
+  const glm::mat4 localToClip = worldToClip * object.transform.localToWorld;
+  for (std::size_t i = 0; i < segmentCount; ++i) {
+    const glm::vec2 start = points[i];
+    const glm::vec2 end = points[(i + 1) % points.size()];
+    const glm::vec2 delta = end - start;
+    const float length = glm::length(delta);
+    if (length <= 1.0e-6F)
+      continue;
+    const glm::vec2 normal{-delta.y / length * halfWidth,
+                           delta.x / length * halfWidth};
+    const auto base = static_cast<uint32_t>(batch.vertices.size());
+    for (const glm::vec2 point :
+         {start + normal, end + normal, end - normal, start - normal})
+      batch.vertices.push_back(
+          TransformPosition(localToClip, {point.x, point.y, 0.0F}));
+    for (const uint32_t index : {0U, 1U, 2U, 2U, 3U, 0U})
+      batch.indices.push_back(base + index);
+  }
+}
+
 void AppendRectangle(GeometryBatch &batch, const RectangleShape &rectangle,
-                     const glm::mat4 &transform) {
+                     const glm::mat4 &localToWorld,
+                     const glm::mat4 &worldToClip) {
   const auto baseVertex = static_cast<uint32_t>(batch.vertices.size());
   const glm::vec2 halfSize = rectangle.size * 0.5F;
   constexpr float z = 0.0F;
@@ -103,7 +145,8 @@ void AppendRectangle(GeometryBatch &batch, const RectangleShape &rectangle,
                                    glm::vec3{halfSize.x, -halfSize.y, z},
                                    glm::vec3{halfSize.x, halfSize.y, z},
                                    glm::vec3{-halfSize.x, halfSize.y, z}})
-    batch.vertices.emplace_back(TransformPosition(transform, position));
+    batch.vertices.emplace_back(
+        TransformPosition(worldToClip * localToWorld, position));
   for (const uint32_t index : {0U, 1U, 2U, 2U, 3U, 0U})
     batch.indices.push_back(baseVertex + index);
 }
@@ -202,18 +245,23 @@ void Renderer::BuildRenderGraph(RenderGraph &graph) {
 
         GeometryBatch batch;
         for (const auto &path : data.pathFills)
-          AppendFilledPath(batch, path);
+          AppendFilledPath(batch, path, data.configuration.worldToClip);
+        for (const auto &path : data.pathStrokes)
+          AppendStrokedPath(batch, path, data.configuration.worldToClip);
         for (const auto &surface : data.surfaces) {
           if (const auto *mesh = std::get_if<MeshSurface>(&surface.geometry))
-            AppendMesh(batch, mesh->mesh, surface.transform.localToWorld);
+            AppendMesh(batch, mesh->mesh, surface.transform.localToWorld,
+                       data.configuration.worldToClip);
         }
         for (const auto &shape : data.shapes) {
           if (const auto *rectangle =
                   std::get_if<RectangleShape>(&shape.geometry))
-            AppendRectangle(batch, *rectangle, shape.transform.localToWorld);
+            AppendRectangle(batch, *rectangle, shape.transform.localToWorld,
+                            data.configuration.worldToClip);
         }
         for (const auto &mesh : data.meshes)
-          AppendMesh(batch, mesh.geometry, mesh.transform.localToWorld);
+          AppendMesh(batch, mesh.geometry, mesh.transform.localToWorld,
+                     data.configuration.worldToClip);
 
         BufferHandle vertexBuffer;
         BufferHandle indexBuffer;
@@ -229,7 +277,7 @@ void Renderer::BuildRenderGraph(RenderGraph &graph) {
               {.size = static_cast<uint32_t>(indexBytes.size()),
                .usage = static_cast<BufferUsage>(BufferUsageFlags::IndexBuffer),
                .initialData = indexBytes});
-          commands->BindVertexBuffer(vertexBuffer, sizeof(glm::vec3));
+          commands->BindVertexBuffer(vertexBuffer, sizeof(glm::vec4));
           commands->BindIndexBuffer(indexBuffer);
           commands->DrawIndexed(static_cast<uint32_t>(batch.indices.size()));
         }
@@ -239,20 +287,21 @@ void Renderer::BuildRenderGraph(RenderGraph &graph) {
         if (data.configuration.textPipeline.value != 0 && !data.text.empty()) {
           commands->BindPipeline(data.configuration.textPipeline);
           for (const auto &text : data.text) {
-            /* const auto bitmap =
+            if (!text.fontSize.IsAbsolute() || text.fontSize.Value() <= 0.0)
+              continue;
+            const auto bitmap =
                 RasterizeText(text.text, data.configuration.fontFile);
             if (bitmap.Empty())
               continue;
-            const float pixelsPerUnit = std::max(text.pixelsPerUnit, 1.0e-6F);
-            const float bitmapScale = std::max(text.fontSizePixels, 0.0F) /
-                                      static_cast<float>(GlyphPixelHeight);
-            const float width =
-                static_cast<float>(bitmap.width) * bitmapScale / pixelsPerUnit;
-            const float height =
-                static_cast<float>(bitmap.height) * bitmapScale / pixelsPerUnit;
+            const float emHeight = static_cast<float>(
+                text.fontSize.As(Language::LengthUnit::Meter).Value());
+            const float scale = emHeight / static_cast<float>(GlyphPixelHeight);
+            const float width = static_cast<float>(bitmap.width) * scale;
+            const float height = static_cast<float>(bitmap.height) * scale;
+            const glm::mat4 localToClip =
+                data.configuration.worldToClip * text.transform.localToWorld;
             const auto transformed = [&](float x, float y) {
-              return TransformPosition(text.transform.localToWorld,
-                                       {x, y, 0.0F});
+              return TransformPosition(localToClip, {x, y, 0.0F});
             };
             const std::array<TextVertex, 6> vertices{{
                 {transformed(0.0F, -height), {0.0F, 1.0F}},
@@ -277,7 +326,7 @@ void Renderer::BuildRenderGraph(RenderGraph &graph) {
             textImages.push_back(image);
             commands->BindVertexBuffer(vertexBuffer, sizeof(TextVertex));
             commands->BindTexture(0, image);
-            commands->Draw(PrimitiveTopology::Triangles, 6, 0); */
+            commands->Draw(PrimitiveTopology::Triangles, 6, 0);
           }
         }
         commands->EndRendering();

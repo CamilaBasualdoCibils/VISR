@@ -4,6 +4,7 @@
 #include "ARUI/Render/RenderGraph.hpp"
 #include "ARUI/Render/Renderer.hpp"
 #include "ARUI/Render/StandardPipeline.hpp"
+#include "ARUI/Runtime/Painters/AruiFlatPainter.hpp"
 #include "ARUI/Runtime/RuntimePainter.hpp"
 
 #include <algorithm>
@@ -58,70 +59,15 @@ float Radians(const std::optional<Language::Angle> &angle) {
                                                     : value;
 }
 
-Render::MeshRenderObject MakeQuad(const RenderView &view, glm::vec3 center,
-                                  glm::vec3 right, glm::vec3 up, float width,
-                                  float height) {
+Render::MeshRenderObject MakeQuad(glm::vec3 center, glm::vec3 right,
+                                  glm::vec3 up, float width, float height) {
   const glm::vec3 horizontal = right * width * 0.5F;
   const glm::vec3 vertical = up * height * 0.5F;
-  const std::array worldPositions = {
-      center - horizontal - vertical, center + horizontal - vertical,
-      center + horizontal + vertical, center - horizontal + vertical};
-  // This temporary pipeline accepts NDC positions, so clip in homogeneous
-  // coordinates before dividing by w. Dividing a vertex behind the eye first
-  // turns a near-plane crossing into an enormous screen-space triangle.
-  const glm::mat4 viewProjection = view.projection * view.view;
-  std::vector<glm::vec4> polygon;
-  polygon.reserve(worldPositions.size());
-  for (const glm::vec3 position : worldPositions)
-    polygon.push_back(viewProjection * glm::vec4(position, 1.0F));
-
-  struct ClipPlane {
-    glm::vec4 equation;
-    float minimum;
-  };
-  const std::array clipPlanes = {ClipPlane{{0.0F, 0.0F, 0.0F, 1.0F}, 1.0e-5F},
-                                 ClipPlane{{0.0F, 0.0F, 1.0F, 1.0F}, 0.0F},
-                                 ClipPlane{{0.0F, 0.0F, -1.0F, 1.0F}, 0.0F},
-                                 ClipPlane{{1.0F, 0.0F, 0.0F, 1.0F}, 0.0F},
-                                 ClipPlane{{-1.0F, 0.0F, 0.0F, 1.0F}, 0.0F},
-                                 ClipPlane{{0.0F, 1.0F, 0.0F, 1.0F}, 0.0F},
-                                 ClipPlane{{0.0F, -1.0F, 0.0F, 1.0F}, 0.0F}};
-  for (const ClipPlane &plane : clipPlanes) {
-    if (polygon.empty())
-      break;
-    std::vector<glm::vec4> clipped;
-    clipped.reserve(polygon.size() + 1);
-    glm::vec4 previous = polygon.back();
-    float previousDistance = glm::dot(plane.equation, previous) - plane.minimum;
-    for (const glm::vec4 &current : polygon) {
-      const float currentDistance =
-          glm::dot(plane.equation, current) - plane.minimum;
-      const bool previousInside = previousDistance >= 0.0F;
-      const bool currentInside = currentDistance >= 0.0F;
-      if (previousInside != currentInside) {
-        const float t = previousDistance / (previousDistance - currentDistance);
-        clipped.push_back(previous + t * (current - previous));
-      }
-      if (currentInside)
-        clipped.push_back(current);
-      previous = current;
-      previousDistance = currentDistance;
-    }
-    polygon = std::move(clipped);
-  }
-
-  Render::MeshGeometry geometry;
-  if (polygon.size() < 3)
-    return {.geometry = std::move(geometry)};
-  geometry.positions.reserve(polygon.size());
-  for (const glm::vec4 &clip : polygon)
-    geometry.positions.emplace_back(glm::vec3{clip} / clip.w);
-  for (uint32_t i = 1; i + 1 < polygon.size(); ++i) {
-    geometry.indices.push_back(0);
-    geometry.indices.push_back(i);
-    geometry.indices.push_back(i + 1);
-  }
-  return {.geometry = std::move(geometry)};
+  return {.geometry = {.positions = {center - horizontal - vertical,
+                                     center + horizontal - vertical,
+                                     center + horizontal + vertical,
+                                     center - horizontal + vertical},
+                       .indices = {0, 1, 2, 2, 3, 0}}};
 }
 
 void SubmitTrackedHands(Render::Renderer &renderer, const RenderView &view,
@@ -181,14 +127,14 @@ void SubmitTrackedHands(Render::Renderer &renderer, const RenderView &view,
       if (glm::length(side) < 0.1F)
         side = glm::cross(glm::normalize(axis), cameraUp);
       side = glm::normalize(side);
-      renderer.Submit(MakeQuad(view, (from + to) * 0.5F, glm::normalize(axis),
-                               side, length, 0.008F));
+      renderer.Submit(MakeQuad((from + to) * 0.5F, glm::normalize(axis), side,
+                               length, 0.008F));
     }
     for (const auto &joint : poses) {
       if (!joint || !joint->positionValid)
         continue;
-      renderer.Submit(MakeQuad(view, joint->pose.position, cameraRight,
-                               cameraUp, 0.014F, 0.014F));
+      renderer.Submit(MakeQuad(joint->pose.position, cameraRight, cameraUp,
+                               0.014F, 0.014F));
     }
   }
 }
@@ -210,8 +156,8 @@ void SubmitTrackedBody(Render::Renderer &renderer, const RenderView &view,
       continue;
     // The hand tracker already draws fingers at a finer resolution.
     if (joint < 18 || joint >= 70 || !tracker.IsHandTracked(joint < 44 ? 0 : 1))
-      renderer.Submit(MakeQuad(view, pose->pose.position, cameraRight, cameraUp,
-                               0.022F, 0.022F));
+      renderer.Submit(
+          MakeQuad(pose->pose.position, cameraRight, cameraUp, 0.022F, 0.022F));
     const int32_t parent = tracker.GetBodyJointParent(joint);
     if (parent < 0 || static_cast<size_t>(parent) >= count || !poses[parent] ||
         !poses[parent]->positionValid)
@@ -230,15 +176,13 @@ void SubmitTrackedBody(Render::Renderer &renderer, const RenderView &view,
     if (glm::length(side) < 0.1F)
       side = glm::cross(glm::normalize(axis), cameraUp);
     side = glm::normalize(side);
-    renderer.Submit(MakeQuad(view, (from + to) * 0.5F, glm::normalize(axis),
-                             side, length, 0.012F));
+    renderer.Submit(MakeQuad((from + to) * 0.5F, glm::normalize(axis), side,
+                             length, 0.012F));
   }
 }
 
 Runtime::SurfacePaintView MakeSurfaceView(const Runtime::RNode &surface,
-                                          const RenderView &view,
-                                          SimulatorXRTracker &tracker,
-                                          glm::uvec2 extent) {
+                                          SimulatorXRTracker &tracker) {
   const float x = Meters(surface.style.xOffset, 0.0F);
   const float y = Meters(surface.style.yOffset, 0.0F);
   const float z = Meters(surface.style.zOffset, -2.0F);
@@ -260,18 +204,7 @@ Runtime::SurfacePaintView MakeSurfaceView(const Runtime::RNode &surface,
                                          Radians(surface.style.zRotation)}));
   const glm::mat4 model =
       glm::translate(glm::mat4{1.0F}, center) * glm::mat4_cast(orientation);
-  const glm::mat4 localToClip = view.projection * view.view * model;
-
-  const auto project = [&](glm::vec3 local) {
-    const glm::vec4 clip = localToClip * glm::vec4{local, 1.0F};
-    return glm::vec2{clip} / clip.w;
-  };
-  constexpr float sampleMeters = 0.01F;
-  const float pixelsPerMeter =
-      std::max(1.0F, glm::length(project({0.0F, sampleMeters, 0.0F}) -
-                                 project({0.0F, 0.0F, 0.0F})) *
-                         static_cast<float>(extent.y) * 0.5F / sampleMeters);
-  return {.localToClip = localToClip, .pixelsPerMeter = pixelsPerMeter};
+  return {.localToWorld = model};
 }
 
 } // namespace
@@ -307,6 +240,7 @@ int SimulatorApplication::Run() {
 
   Render::StandardPipeline standardPipeline{*renderDevice_};
   Runtime::PainterRegistry painters;
+  Runtime::RegisterAruiFlatPainter(painters);
   using Clock = std::chrono::steady_clock;
   const auto framePeriod = std::chrono::duration_cast<Clock::duration>(
       std::chrono::duration<double>{1.0 / 90.0});
@@ -338,7 +272,8 @@ int SimulatorApplication::Run() {
                                       ? glm::vec4{0.0F}
                                       : glm::vec4{0.08F, 0.09F, 0.12F, 1.0F},
                .extent = imageExtents[i],
-               .offset = {0, 0}}));
+               .offset = {0, 0}},
+              frameViews[i].projection * frameViews[i].view));
       Render::RenderGraph graph;
       renderer.BeginFrame();
       Runtime::PaintContext paintContext{renderer};
@@ -347,9 +282,7 @@ int SimulatorApplication::Run() {
         if (!surface || surface->surfaceType != Language::SurfaceType::Plane)
           continue;
         Runtime::PaintRuntimeSurface(paintContext, painters, runtimeTree_, root,
-                                     MakeSurfaceView(*surface, frameViews[i],
-                                                     *tracker_,
-                                                     imageExtents[i]));
+                                     MakeSurfaceView(*surface, *tracker_));
       }
       if (tracker_->DrawSkeletons()) {
         SubmitTrackedHands(renderer, frameViews[i], *tracker_);

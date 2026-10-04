@@ -1,25 +1,18 @@
 #pragma once
 
-
 #include "ARUI/Runtime/IPainter.hpp"
-namespace ARUI::Runtime
-{
 
-    class AruiFlatPainter : public IPainter
-    {
+namespace ARUI::Runtime {
 
-    public:
-      void
-      Paint(const PaintTreeContext &context,
-            const Language::PainterStyleProperties &properties) const override {
+class AruiFlatPainter final : public IPainter {
+public:
+  void Paint(const PaintTreeContext &context,
+             const Language::PainterStyleProperties &properties) const override;
 
-      }
-
-      [[nodiscard("")]] const Language::PainterStyleSchema &
-      StyleSchema() const noexcept override {
-   
-      }
-
-      
-    };
+  [[nodiscard]] const Language::PainterStyleSchema &
+  StyleSchema() const noexcept override;
 };
+
+void RegisterAruiFlatPainter(PainterRegistry &registry);
+
+} // namespace ARUI::Runtime

@@ -6,11 +6,11 @@
 namespace ARUI::Runtime {
 
 struct SurfacePaintView {
-  glm::mat4 localToClip{1.0F};
-  float pixelsPerMeter{1.0F};
+  // Surface-local physical coordinates to world space. Camera transforms belong
+  // to the renderer and must not be supplied to a painter.
+  glm::mat4 localToWorld{1.0F};
 };
 
-// Paints one complete runtime surface through the registered node painters.
 void PaintRuntimeSurface(PaintContext &context, const PainterRegistry &painters,
                          const RuntimeTree &runtime, NodeID surface,
                          const SurfacePaintView &view);

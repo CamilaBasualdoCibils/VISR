@@ -1,4 +1,4 @@
-add_executable(ARUIRuntimeTests RuntimeTreeTests.cpp)
+add_executable(ARUIRuntimeTests RuntimeTreeTests.cpp PainterTests.cpp)
 find_package(GTest CONFIG REQUIRED)
 include(GoogleTest)
 target_link_libraries(ARUIRuntimeTests PRIVATE

@@ -7,6 +7,8 @@
 #include "ARUI/Runtime/RuntimeTree.hpp"
 
 #include <algorithm>
+#include <cstring>
+#include <glm/ext/matrix_transform.hpp>
 #include <gtest/gtest.h>
 
 using namespace ARUI::Render;
@@ -53,8 +55,10 @@ public:
     return ImageHandle{createdImages};
   }
   ImageViewHandle CreateImageView(const ImageViewDesc &) override { return {}; }
-  BufferHandle CreateBuffer(const BufferDesc &) override {
+  BufferHandle CreateBuffer(const BufferDesc &description) override {
     ++createdBuffers;
+    bufferUploads.emplace_back(description.initialData.begin(),
+                               description.initialData.end());
     return BufferHandle{createdBuffers};
   }
   ShaderModuleHandle CreateShaderModule(const ShaderModuleDesc &) override {
@@ -80,6 +84,7 @@ public:
   }
   uint32_t createdCommandLists{}, submitCount{}, createdBuffers{},
       destroyedBuffers{}, createdImages{}, destroyedImages{};
+  std::vector<std::vector<std::byte>> bufferUploads;
   RecordedCommands lastSubmission;
 };
 
@@ -200,6 +205,91 @@ TEST(Renderer, BatchesRectanglesAndTriangleMeshesIntoOneIndexedDraw) {
   EXPECT_EQ(device.lastSubmission.drawnVertices, 9);
 }
 
+TEST(Renderer, AppliesViewProjectionAfterPainterWorldTransform) {
+  RecordingDevice device;
+  auto configuration = Configuration();
+  configuration.worldToClip = glm::scale(glm::mat4{1.0F}, {2.0F, 3.0F, 1.0F});
+  Renderer renderer(device, configuration);
+  RenderGraph graph;
+  renderer.BeginFrame();
+  renderer.Submit(ShapeRenderObject{
+      .geometry = RectangleShape{.size = {2.0F, 2.0F}},
+      .transform = {.localToWorld =
+                        glm::translate(glm::mat4{1.0F}, {3.0F, 4.0F, -2.0F})}});
+  renderer.BuildRenderGraph(graph);
+  graph.Compile();
+  graph.Execute(device);
+  renderer.EndFrame();
+
+  ASSERT_GE(device.bufferUploads.size(), 1U);
+  ASSERT_GE(device.bufferUploads[0].size(), sizeof(glm::vec4));
+  glm::vec4 firstVertex;
+  std::memcpy(&firstVertex, device.bufferUploads[0].data(),
+              sizeof(firstVertex));
+  EXPECT_EQ(firstVertex, (glm::vec4{4.0F, 9.0F, -2.0F, 1.0F}));
+}
+
+TEST(Renderer, RasterizesPhysicalTextAndTransformsItsQuad) {
+  RecordingDevice device;
+  auto configuration = Configuration();
+  configuration.textPipeline = GraphicsPipelineHandle{43};
+  configuration.worldToClip =
+      glm::translate(glm::mat4{1.0F}, {0.25F, -0.5F, 0.0F});
+  Renderer renderer(device, configuration);
+  RenderGraph graph;
+  renderer.BeginFrame();
+  renderer.Submit(TextRenderObject{
+      .text = "ARUI",
+      .fontSize = {6.0, ARUI::Language::LengthUnit::Millimeter},
+      .transform = {.localToWorld =
+                        glm::translate(glm::mat4{1.0F}, {1.0F, 2.0F, -3.0F})}});
+  renderer.BuildRenderGraph(graph);
+  graph.Compile();
+  graph.Execute(device);
+  renderer.EndFrame();
+
+  EXPECT_EQ(device.createdImages, 1U);
+  EXPECT_EQ(device.destroyedImages, 1U);
+  EXPECT_EQ(device.lastSubmission.bindTextureCount, 1U);
+  EXPECT_EQ(device.lastSubmission.drawnVertices, 6U);
+  ASSERT_FALSE(device.bufferUploads.empty());
+  glm::vec4 firstVertex;
+  std::memcpy(&firstVertex, device.bufferUploads.front().data(),
+              sizeof(firstVertex));
+  EXPECT_NEAR(firstVertex.x, 1.25F, 1.0e-6F);
+  EXPECT_LT(firstVertex.y, 1.5F);
+  EXPECT_NEAR(firstVertex.z, -3.0F, 1.0e-6F);
+  EXPECT_NEAR(firstVertex.w, 1.0F, 1.0e-6F);
+}
+
+TEST(Renderer, TessellatesPhysicalStrokePathsInTheConfiguredView) {
+  RecordingDevice device;
+  auto configuration = Configuration();
+  configuration.worldToClip =
+      glm::translate(glm::mat4{1.0F}, {0.5F, 0.25F, 0.0F});
+  Renderer renderer(device, configuration);
+  RenderGraph graph;
+  Path path;
+  path.Move({0.0F, 0.0F}).Line({1.0F, 0.0F});
+  renderer.BeginFrame();
+  renderer.StrokePath(
+      {.path = std::move(path),
+       .style = {.width = {2.0, ARUI::Language::LengthUnit::Centimeter}},
+       .transform = {.localToWorld = glm::mat4{1.0F}}});
+  renderer.BuildRenderGraph(graph);
+  graph.Compile();
+  graph.Execute(device);
+  renderer.EndFrame();
+
+  EXPECT_EQ(device.lastSubmission.drawnVertices, 6U);
+  ASSERT_FALSE(device.bufferUploads.empty());
+  glm::vec4 firstVertex;
+  std::memcpy(&firstVertex, device.bufferUploads.front().data(),
+              sizeof(firstVertex));
+  EXPECT_NEAR(firstVertex.x, 0.5F, 1.0e-6F);
+  EXPECT_NEAR(firstVertex.y, 0.26F, 1.0e-6F);
+}
+
 TEST(Renderer, EnforcesFrameSubmissionLifecycle) {
   RecordingDevice device;
   Renderer renderer(device, Configuration());
@@ -211,166 +301,6 @@ TEST(Renderer, EnforcesFrameSubmissionLifecycle) {
   EXPECT_THROW(renderer.Submit(TextRenderObject{}), std::logic_error);
   renderer.EndFrame();
 }
-
-/* TEST(PainterRegistry, RegistersAndFindsDefaultPainter) {
-  PainterRegistry registry;
-  RegisterFlatPainter(registry);
-  const auto *painter = registry.Find("default");
-  ASSERT_NE(painter, nullptr);
-  ASSERT_NE(painter->StyleSchema().Find("fill"), nullptr);
-  ASSERT_NE(painter->StyleSchema().Find("stroke"), nullptr);
-  ASSERT_NE(painter->StyleSchema().Find("stroke-width"), nullptr);
-  EXPECT_EQ(registry.Find("arui-flat-painter"), painter);
-  EXPECT_EQ(registry.Default(), painter);
-  EXPECT_TRUE(painter->StyleSchema().Accepts(
-      "fill", ARUI::Language::PainterStyleValue{std::string{"none"}}));
-  EXPECT_EQ(registry.Find("missing"), nullptr);
-}
-
-TEST(PainterRegistry, RejectsDuplicateRegistration) {
-  PainterRegistry registry;
-  RegisterFlatPainter(registry);
-  EXPECT_THROW(RegisterFlatPainter(registry), std::logic_error);
-}
-
-TEST(Font, RasterizesNotoSansUtf8ToCoverageBitmap) {
-  const auto bitmap = RasterizeText("Hello, ARUI! — café", DefaultFontFile());
-  EXPECT_FALSE(bitmap.Empty());
-  EXPECT_GT(bitmap.width, 0u);
-  EXPECT_GT(bitmap.height, 0u);
-  EXPECT_EQ(bitmap.pixels.size(),
-            static_cast<std::size_t>(bitmap.width) * bitmap.height);
-  EXPECT_NE(std::find_if(bitmap.pixels.begin(), bitmap.pixels.end(),
-                         [](std::byte value) { return value != std::byte{}; }),
-            bitmap.pixels.end());
-}
-
-TEST(Renderer, DrawsSubmittedTextAsUploadedBitmapQuad) {
-  RecordingDevice device;
-  auto configuration = Configuration();
-  configuration.textPipeline = GraphicsPipelineHandle{43};
-  Renderer renderer(device, configuration);
-  RenderGraph graph;
-  renderer.BeginFrame();
-  renderer.Submit(
-      TextRenderObject{.text = "Hello, ARUI!", .fontSizePixels = 36.0F});
-  renderer.BuildRenderGraph(graph);
-  graph.Compile();
-  graph.Execute(device);
-  renderer.EndFrame();
-  EXPECT_EQ(device.createdImages, 1u);
-  EXPECT_EQ(device.destroyedImages, 1u);
-  EXPECT_EQ(device.lastSubmission.bindTextureCount, 1u);
-  EXPECT_EQ(device.lastSubmission.drawnVertices, 6u);
-}
-
-TEST(DefaultPainter, PlainTextEmitsTextWithoutBackgroundBox) {
-  RecordingDevice device;
-  Renderer renderer(device, Configuration());
-  PainterRegistry registry;
-  RegisterFlatPainter(registry);
-  renderer.BeginFrame();
-  PaintContext context{renderer};
-  ARUI::Language::Attributes attributes{{"text", std::string{"Hello, ARUI!"}}};
-  registry.Find("default")->Paint({.type = ARUI::Language::LNodeType::Text,
-                                   .attributes = &attributes,
-                                   .fontSizePixels = 36.0F,
-                                   .fontFamily = "Noto Sans"},
-                                  {}, context);
-  EXPECT_EQ(renderer.SubmissionCounts().text, 1u);
-  EXPECT_EQ(renderer.SubmissionCounts().shapes, 0u);
-  renderer.EndFrame();
-}
-
-namespace {
-const IPainter &PanelPainter() {
-  static PainterRegistry registry;
-  static const IPainter *painter = [] {
-    RegisterFlatPainter(registry);
-    return registry.Find("arui-flat-painter");
-  }();
-  return *painter;
-}
-
-PaintNode PanelNode() {
-  return {.type = ARUI::Language::LNodeType::Panel, .size = {2.0F, 1.0F}};
-}
-} // namespace
-
-TEST(DefaultPanelPainter, UnstyledPanelEmitsNothing) {
-  SemanticRecorder renderer;
-  PaintContext context{renderer};
-  PanelPainter().Paint(PanelNode(), {}, context);
-  EXPECT_TRUE(renderer.fills.empty());
-  EXPECT_TRUE(renderer.strokes.empty());
-  EXPECT_EQ(renderer.shapes, 0u);
-  EXPECT_EQ(renderer.meshes, 0u);
-}
-
-TEST(DefaultPanelPainter, FilledPanelEmitsOneSemanticFill) {
-  SemanticRecorder renderer;
-  PaintContext context{renderer};
-  const ARUI::Language::Color dark{{0.1F, 0.2F, 0.3F, 1.0F}};
-  PanelPainter().Paint(PanelNode(), {{"fill", dark}}, context);
-  ASSERT_EQ(renderer.fills.size(), 1u);
-  EXPECT_TRUE(std::holds_alternative<SolidFill>(renderer.fills[0].style.fill));
-  EXPECT_TRUE(renderer.strokes.empty());
-  EXPECT_EQ(renderer.meshes, 0u);
-}
-
-TEST(DefaultPanelPainter, StrokeIsOneClosedPathInPhysicalUnits) {
-  SemanticRecorder renderer;
-  PaintContext context{renderer};
-  const ARUI::Language::Color white{{1.0F, 1.0F, 1.0F, 1.0F}};
-  PanelPainter().Paint(
-      PanelNode(),
-      {{"stroke", white},
-       {"stroke-width",
-        ARUI::Language::Length{2.0, ARUI::Language::LengthUnit::Millimeter}}},
-      context);
-  ASSERT_EQ(renderer.strokes.size(), 1u);
-  const auto &stroke = renderer.strokes[0];
-  EXPECT_TRUE(stroke.path.IsClosed());
-  ASSERT_EQ(stroke.path.commands.size(), 5u);
-  EXPECT_TRUE(std::holds_alternative<MoveTo>(stroke.path.commands[0]));
-  EXPECT_TRUE(std::holds_alternative<LineTo>(stroke.path.commands[1]));
-  EXPECT_TRUE(std::holds_alternative<LineTo>(stroke.path.commands[2]));
-  EXPECT_TRUE(std::holds_alternative<LineTo>(stroke.path.commands[3]));
-  EXPECT_TRUE(std::holds_alternative<ClosePath>(stroke.path.commands[4]));
-  EXPECT_EQ(
-      stroke.style.width,
-      (ARUI::Language::Length{2.0, ARUI::Language::LengthUnit::Millimeter}));
-  EXPECT_EQ(renderer.shapes, 0u);
-  EXPECT_EQ(renderer.meshes, 0u);
-}
-
-TEST(DefaultPanelPainter, FillAndStrokeEmitIndependentConcepts) {
-  SemanticRecorder renderer;
-  PaintContext context{renderer};
-  const ARUI::Language::Color color{{0.5F, 0.5F, 0.5F, 1.0F}};
-  PanelPainter().Paint(
-      PanelNode(),
-      {{"fill", color},
-       {"stroke", color},
-       {"stroke-width",
-        ARUI::Language::Length{1.0, ARUI::Language::LengthUnit::Centimeter}}},
-      context);
-  EXPECT_EQ(renderer.fills.size(), 1u);
-  EXPECT_EQ(renderer.strokes.size(), 1u);
-}
-
-TEST(DefaultPanelPainter, ZeroWidthStrokeEmitsNothing) {
-  SemanticRecorder renderer;
-  PaintContext context{renderer};
-  const ARUI::Language::Color white{{1.0F, 1.0F, 1.0F, 1.0F}};
-  PanelPainter().Paint(
-      PanelNode(),
-      {{"stroke", white},
-       {"stroke-width",
-        ARUI::Language::Length{0.0, ARUI::Language::LengthUnit::Millimeter}}},
-      context);
-  EXPECT_TRUE(renderer.strokes.empty());
-} */
 
 TEST(SemanticPath, PreservesCubicCurvesWithoutFlattening) {
   Path path;
@@ -401,36 +331,3 @@ TEST(Color, ConvertsAuthoredSRGBHexToLinearFloatColor) {
   EXPECT_NEAR(mid->rgba.b, 0.21586F, 0.0001F);
   EXPECT_NEAR(mid->rgba.a, 128.0F / 255.0F, 0.0001F);
 }
-
-/* TEST(RuntimePainter, TraversesRuntimeTreeThroughRegisteredSemanticPainters) {
-  ARUI::Language::Style surfaceStyle;
-  surfaceStyle.width = {0.4, ARUI::Language::LengthUnit::Meter};
-  surfaceStyle.height = {0.2, ARUI::Language::LengthUnit::Meter};
-  ARUI::Language::Style panelStyle;
-  panelStyle.painterProperties["fill"] =
-      ARUI::Language::Color{{0.1F, 0.2F, 0.3F, 1.0F}};
-
-  ARUI::Runtime::RuntimeTree runtime;
-  auto transaction = runtime.BeginTransaction();
-  transaction.InsertTree(
-      runtime.Root(),
-      ARUI::Language::LSurface(
-          {ARUI::Language::LPanel({ARUI::Language::LText("Shared")}, {},
-                                  panelStyle)},
-          {}, surfaceStyle));
-  transaction.Commit();
-
-  PainterRegistry painters;
-  RegisterFlatPainter(painters);
-  SemanticRecorder renderer;
-  PaintContext context{renderer};
-  ASSERT_EQ(runtime.RootChildren().size(), 1u);
-  PaintRuntimeSurface(
-      context, painters, runtime, runtime.RootChildren()[0],
-      {.localToClip = glm::mat4{1.0F}, .pixelsPerMeter = 1000.0F});
-  EXPECT_EQ(renderer.fills.size(), 1u);
-  EXPECT_EQ(renderer.texts, 1u);
-  EXPECT_EQ(renderer.meshes, 0u);
-  EXPECT_EQ(renderer.shapes, 0u);
-}
- */

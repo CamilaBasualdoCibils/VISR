@@ -13,8 +13,6 @@
 
 namespace ARUI::Runtime {
 inline constexpr std::string_view DefaultPainterName{"arui-flat-painter"};
-// Immutable output of layout. Painters do not compute bounds or placement.
-
 using ComputedPainterStyle = Language::PainterStyleProperties;
 
 class PaintContext {
@@ -42,8 +40,6 @@ struct PaintTreeContext {
   // Physical extent of the root surface.
   glm::vec2 extent;
 
-  // Possibly runtime/environment information:
-  float pixelsPerMeter;
   double time;
 };
 class IPainter {
@@ -67,25 +63,4 @@ public:
 private:
   std::unordered_map<std::string, std::shared_ptr<const IPainter>> painters_;
 };
-/*
-class FlatPainter final : public IPainter {
-public:
-  [[nodiscard]] const Language::PainterStyleSchema &
-  StyleSchema() const noexcept override;
-  void Paint(const PaintNode &, const ComputedPainterStyle &,
-             PaintContext &) const override;
-
-private:
-  Language::PainterStyleSchema schema_{{
-      {"fill", Language::PainterStyleType::Color, false, true},
-      {"stroke", Language::PainterStyleType::Color, false, true},
-      {"stroke-width", Language::PainterStyleType::Length, false},
-      {"font-size", Language::PainterStyleType::Length, true},
-      {"font-family", Language::PainterStyleType::String, true},
-  }};
-};
-
-using DefaultPanelPainter = FlatPainter;
-
-void RegisterFlatPainter(PainterRegistry &registry); */
 } // namespace ARUI::Runtime

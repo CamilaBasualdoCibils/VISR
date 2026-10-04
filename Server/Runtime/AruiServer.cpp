@@ -6,6 +6,7 @@
 #include "ARUI/Render/Renderer.hpp"
 #include "ARUI/Render/StandardPipeline.hpp"
 #include "ARUI/Runtime/IPainter.hpp"
+#include "ARUI/Runtime/Painters/AruiFlatPainter.hpp"
 #include "ARUI/Runtime/RuntimePainter.hpp"
 #include "ARUI/Runtime/RuntimeTree.hpp"
 #include "ARUI/XR/OpenXR/OpenXRPresenter.hpp"
@@ -17,13 +18,55 @@
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <mutex>
+#include <optional>
 #include <span>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <vector>
 
 namespace {
+
+float Meters(const std::optional<ARUI::Language::Length> &length) {
+  if (!length || !length->IsAbsolute())
+    return 0.0F;
+  return static_cast<float>(
+      length->As(ARUI::Language::LengthUnit::Meter).Value());
+}
+
+float Radians(const std::optional<ARUI::Language::Angle> &angle) {
+  if (!angle)
+    return 0.0F;
+  const float value = static_cast<float>(angle->value);
+  return angle->unit == ARUI::Language::AngleUnit::Degree ? glm::radians(value)
+                                                          : value;
+}
+
+glm::mat4 SurfaceLocalToWorld(const ARUI::Runtime::RNode &surface,
+                              ARUI::IXRTracker &tracker) {
+  ARUI::Pose anchor;
+  const auto found = surface.attributes.find("anchor");
+  const auto *name = found == surface.attributes.end()
+                         ? nullptr
+                         : std::get_if<std::string>(&found->second);
+  if (name && *name != "world")
+    if (const auto tracked = tracker.GetPose(*name))
+      anchor = tracked->pose;
+
+  const glm::vec3 offset{Meters(surface.style.xOffset),
+                         Meters(surface.style.yOffset),
+                         Meters(surface.style.zOffset)};
+  const glm::quat rotation =
+      glm::normalize(anchor.orientation *
+                     glm::quat(glm::vec3{Radians(surface.style.xRotation),
+                                         Radians(surface.style.yRotation),
+                                         Radians(surface.style.zRotation)}));
+  const glm::vec3 position = anchor.position + anchor.orientation * offset;
+  return glm::translate(glm::mat4{1.0F}, position) * glm::mat4_cast(rotation);
+}
+
 class StereoStream {
 public:
   StereoStream() {
@@ -129,6 +172,7 @@ int ARUI::Server::AruiServer::Run() {
 
   Render::StandardPipeline standardPipeline{*renderDevice};
   Runtime::PainterRegistry painters;
+  Runtime::RegisterAruiFlatPainter(painters);
   Runtime::RuntimeTree runtime;
   std::mutex runtimeMutex;
   Presentation::RuntimePresentationController presentation(runtime,
@@ -151,17 +195,21 @@ int ARUI::Server::AruiServer::Run() {
                                       ? glm::vec4{0.0F}
                                       : glm::vec4{0.08F, 0.09F, 0.12F, 1.0F},
                .extent = extents[eye],
-               .offset = {0, 0}}));
+               .offset = {0, 0}},
+              views[eye].projection * views[eye].view));
       Render::RenderGraph graph;
       renderer.BeginFrame();
       Runtime::PaintContext paintContext{renderer};
       {
         const std::scoped_lock lock(runtimeMutex);
-        for (const Runtime::NodeID surface : runtime.RootChildren())
+        for (const Runtime::NodeID surface : runtime.RootChildren()) {
+          const auto *node = runtime.Get(surface);
+          if (!node)
+            continue;
           Runtime::PaintRuntimeSurface(
               paintContext, painters, runtime, surface,
-              {.localToClip = views[eye].projection * views[eye].view,
-               .pixelsPerMeter = 600.0F});
+              {.localToWorld = SurfaceLocalToWorld(*node, *tracker)});
+        }
       }
       renderer.BuildRenderGraph(graph);
       graph.Compile();
