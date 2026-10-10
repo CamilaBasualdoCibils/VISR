@@ -3,6 +3,7 @@
 #include "Wire.hpp"
 
 #include <rpc/server.h>
+#include <spdlog/spdlog.h>
 #include <string>
 #include <utility>
 #include <vector>

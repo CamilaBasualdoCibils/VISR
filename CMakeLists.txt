@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10.0)
+cmake_minimum_required(VERSION 3.14)
 project(VISR VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 set(CMAKE_CXX_STANDARD 23)
@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(VISR_ENABLE_TRACY "Enable Tracy profiling instead of mimalloc" OFF)
 
+add_subdirectory(extern/OpenPeripherals)
 include(cmake/Instrumentation.cmake)
 include(cmake/FindDeps.cmake)
 option(BUILD_TESTING "Build VISR tests" ON)

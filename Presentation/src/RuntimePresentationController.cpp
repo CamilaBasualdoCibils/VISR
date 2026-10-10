@@ -1,8 +1,17 @@
 #include "VISR/Presentation/RuntimePresentationController.hpp"
 
+#include <spdlog/spdlog.h>
+#include <sstream>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
+static constexpr void PrintNode(std::stringstream &ss, const VISR::Language::LNode &node, int indent = 0) {
+  
+  for (int i = 0; i < indent; ++i) ss << "  ";
+  ss << "Node ID: " << node.id << ", Type: " << static_cast<int>(node.type) << "\n";
+  for (const auto &child : node.children) PrintNode(ss, child, indent + 1);
+}
 namespace VISR::Presentation {
 namespace {
 Language::LNode ToLanguageTree(const Runtime::RuntimeTree &runtime, Runtime::NodeID id) {
@@ -27,6 +36,9 @@ Language::LNode RuntimePresentationController::GetActiveTree() const {
 }
 void RuntimePresentationController::SetActiveTree(Language::LNode tree) {
   if (tree.type != Language::LNodeType::Surface) throw std::invalid_argument("active tree root must be a surface");
+  std::stringstream ss;
+  PrintNode(ss, tree);
+  spdlog::info("Setting Active Tree:\n{}", ss.str());
   Clear();
   AddTree(Runtime::RootNodeID, std::move(tree));
 }

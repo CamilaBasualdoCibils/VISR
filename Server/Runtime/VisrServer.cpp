@@ -20,6 +20,8 @@
 #include <fcntl.h>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <cstdlib>
+#include <fstream>
 #include <mutex>
 #include <optional>
 #include <span>
@@ -78,7 +80,7 @@ public:
     sockaddr_in address{};
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = htonl(INADDR_ANY);
-    address.sin_port = htons(4242);
+    address.sin_port = htons(4245);
     if (bind(listener_, reinterpret_cast<sockaddr *>(&address),
              sizeof(address)) != 0 ||
         listen(listener_, 1) != 0) {
@@ -180,6 +182,7 @@ int VISR::Server::VisrServer::Run() {
   Presentation::PresentationRpcServer rpcServer(presentation);
   rpcServer.Start();
   StereoStream stereoStream;
+  bool firstFramePresented = false;
 
   while (!stopRequested && !openXRPresenter->ShouldExit()) {
     presenter->BeginFrame();
@@ -222,6 +225,16 @@ int VISR::Server::VisrServer::Run() {
     }
     viewProvider->EndFrame();
     presenter->EndFrame();
+
+    // base.nix starts system experiences only after this first submitted frame.
+    if (!firstFramePresented && views.size() == images.size()) {
+      firstFramePresented = true;
+      if (const char *readyFile = std::getenv("VISR_SERVER_READY_FILE")) {
+        std::ofstream marker{readyFile};
+        if (marker)
+          marker << "ready\n";
+      }
+    }
   }
 
   for (std::size_t eye = 0; eye < 2; ++eye) {

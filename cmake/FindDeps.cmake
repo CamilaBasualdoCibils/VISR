@@ -27,4 +27,11 @@ find_package(Vulkan REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(pugixml CONFIG REQUIRED)
 set(FG_BUILD_TEST OFF)
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../extern/FrameGraph FrameGraph)
+include(FetchContent)
+
+FetchContent_Declare(
+    FrameGraph
+    GIT_REPOSITORY https://github.com/skaarj1989/FrameGraph.git
+    GIT_TAG f84d671aa8a8f2668768b1e9768907b0f95cb978
+)
+FetchContent_MakeAvailable(FrameGraph)
