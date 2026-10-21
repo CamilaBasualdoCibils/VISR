@@ -6,7 +6,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(VISR_ENABLE_TRACY "Enable Tracy profiling instead of mimalloc" OFF)
 
-add_subdirectory(extern/OpenPeripherals)
+if(NOT TARGET OpenPeripherals::Core)
+    add_subdirectory(extern/OpenPeripherals)
+endif()
 include(cmake/Instrumentation.cmake)
 include(cmake/FindDeps.cmake)
 option(BUILD_TESTING "Build VISR tests" ON)
