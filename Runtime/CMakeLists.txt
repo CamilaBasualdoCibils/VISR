@@ -13,6 +13,6 @@ target_link_libraries(VISRRuntime PUBLIC
     VISR::Application)
 target_compile_features(VISRRuntime PUBLIC cxx_std_23)
 
-if(BUILD_TESTING)
+if(VISR_BUILD_TESTS)
     add_subdirectory(Tests)
 endif()

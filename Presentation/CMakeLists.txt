@@ -25,6 +25,6 @@ target_link_libraries(VISRPresentationServer
     PRIVATE rpclib::rpc)
 target_compile_features(VISRPresentationServer PUBLIC cxx_std_23)
 
-if(BUILD_TESTING)
+if(VISR_BUILD_TESTS)
     add_subdirectory(Tests)
 endif()

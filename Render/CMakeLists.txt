@@ -22,7 +22,7 @@ target_compile_definitions(VISRRender PRIVATE
     VISR_DEFAULT_FONT_PATH="${VISR_NOTO_SANS_FONT}")
 target_compile_features(VISRRender PUBLIC cxx_std_23)
 
-if(BUILD_TESTING)
+if(VISR_BUILD_TESTS)
     add_subdirectory(Tests)
 endif()
 
